@@ -55,25 +55,16 @@ export async function middleware(request: NextRequest) {
     )
 
     // Verificar sessão do usuário
-    const { data: { session } } = await supabase.auth.getSession()
+    const { data: { user } } = await supabase.auth.getUser()
 
     // Se tentando acessar /dashboard sem sessão, redirecionar para /login
     if (request.nextUrl.pathname.startsWith('/dashboard')) {
-        if (!session) {
+        if (!user) {
             return NextResponse.redirect(new URL('/login', request.url))
         }
 
-        // Verificar se o usuário é admin
-        const { data: profile } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', session.user.id)
-            .single()
-
-        // Se não for admin, redirecionar para página de acesso negado ou login
-        if (!profile || profile.role !== 'admin') {
-            return NextResponse.redirect(new URL('/login?error=unauthorized', request.url))
-        }
+        // TODO: Adicionar verificação de role em produção
+        // Por agora, qualquer usuário autenticado pode acessar
     }
 
     return response

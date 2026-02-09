@@ -26,7 +26,7 @@ export function Sidebar() {
             {/* Logo/Header */}
             <div className="p-6 border-b border-primary-light">
                 <h1 className="text-xl font-bold text-white">
-                    🌶️ Pepper Control
+                    JATCAIXAAQUI
                 </h1>
                 <p className="text-xs text-white/60 mt-1">Centro de Comando</p>
             </div>

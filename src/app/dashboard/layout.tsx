@@ -20,7 +20,7 @@ export default function DashboardLayout({
                 {/* Footer Institucional */}
                 <footer className="p-4 text-center border-t border-gray-200">
                     <p className="text-xs text-gray-500">
-                        © 2026 CRM Pepper Control. Criado e todos os direitos reservados pela{' '}
+                        © 2026 CRM JATCAIXAAQUI. Criado e todos os direitos reservados pela{' '}
                         <span className="font-semibold text-primary">N7Tech</span>.
                     </p>
                 </footer>

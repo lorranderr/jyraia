@@ -67,7 +67,7 @@ export default function DashboardPage() {
             <div className="bg-gradient-to-r from-primary to-primary-light rounded-xl p-6 text-white">
                 <h2 className="text-lg font-semibold mb-2">🚀 Sistema em Construção</h2>
                 <p className="text-white/80 text-sm">
-                    O CRM Pepper Control está em fase de desenvolvimento.
+                    O CRM JATCAIXAAQUI está em fase de desenvolvimento.
                     A funcionalidade de Kanban para gestão de leads será implementada na Fase 2.
                 </p>
                 <div className="mt-4 flex items-center gap-2">

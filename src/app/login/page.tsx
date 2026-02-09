@@ -40,7 +40,7 @@ function LoginForm() {
                 {/* Logo */}
                 <div className="text-center mb-8">
                     <h1 className="text-4xl font-bold text-white mb-2">
-                        🌶️ Pepper Control
+                        JATCAIXAAQUI
                     </h1>
                     <p className="text-white/70">Centro de Comando</p>
                 </div>
@@ -119,7 +119,7 @@ function LoginForm() {
 
                 {/* Footer */}
                 <p className="text-center text-white/50 text-xs mt-6">
-                    © 2026 CRM Pepper Control. Criado pela N7Tech.
+                    © 2026 CRM JATCAIXAAQUI. Criado pela N7Tech.
                 </p>
             </div>
         </div>
