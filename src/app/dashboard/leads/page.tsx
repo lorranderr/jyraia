@@ -1,7 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Plus, Phone, User, GripVertical, AlertCircle, Clock, Edit, Trash2, X } from 'lucide-react'
+import {
+    Plus, Phone, User, AlertCircle, Clock,
+    Edit, Trash2, X, MapPin, CreditCard, FileText, Info,
+    History, Briefcase, TrendingUp, Calendar, Trash
+} from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import {
     DndContext,
@@ -11,10 +15,9 @@ import {
     useSensor,
     useSensors,
     DragOverlay,
-    defaultDropAnimationSideEffects,
+    useDroppable,
 } from '@dnd-kit/core'
 import {
-    arrayMove,
     SortableContext,
     sortableKeyboardCoordinates,
     verticalListSortingStrategy,
@@ -22,7 +25,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 
-// Tipos baseados na tabela existente
+// Tipos expandidos conforme plano
 interface Lead {
     id: string
     phone: string
@@ -36,6 +39,37 @@ interface Lead {
     needs_followup: boolean | null
     objecao_tipo: string | null
     followup_count: number | null
+    // Novos campos
+    cep: string | null
+    logradouro: string | null
+    numero: string | null
+    bairro: string | null
+    complemento: string | null
+    cidade: string | null
+    estado: string | null
+    data_nascimento: string | null
+    estado_civil: string | null
+    profissao: string | null
+    renda_mensal: number | null
+    tem_filhos: boolean | null
+    qtd_filhos: number | null
+    ultimo_emprestimo_data: string | null
+    ultimo_emprestimo_valor: number | null
+    ultimo_emprestimo_banco: string | null
+}
+
+interface Contract {
+    id: string
+    lead_id: string
+    valor_total: number
+    banco_parceiro: string
+    data_assinatura: string
+    taxa_juros: number | null
+    parcelas: number | null
+    comissao_valor: number | null
+    status: string
+    observacoes: string | null
+    created_at: string
 }
 
 const KANBAN_COLUMNS = [
@@ -76,10 +110,12 @@ function SortableLeadCard({
         <div
             ref={setNodeRef}
             style={style}
-            className="bg-white rounded-lg shadow-sm p-4 hover:shadow-md transition-shadow group border-l-4 border-l-primary"
+            className="bg-white rounded-lg shadow-sm p-4 hover:shadow-md transition-shadow group border-l-4 border-l-primary cursor-grab active:cursor-grabbing"
+            {...attributes}
+            {...listeners}
         >
             <div className="flex items-start justify-between gap-2">
-                <div className="flex-1 min-w-0" {...attributes} {...listeners}>
+                <div className="flex-1 min-w-0">
                     <h4 className="font-medium text-gray-900 text-sm truncate">
                         {lead.name || 'Sem nome'}
                     </h4>
@@ -88,26 +124,29 @@ function SortableLeadCard({
                         <span>{lead.phone}</span>
                     </div>
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1 shrink-0">
                     <button
-                        onClick={() => onEdit(lead)}
-                        className="p-1 text-gray-400 hover:text-blue-600 transition-colors opacity-0 group-hover:opacity-100"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onEdit(lead);
+                        }}
+                        className="p-2 text-gray-400 hover:text-blue-600 transition-colors opacity-0 group-hover:opacity-100 bg-gray-50 rounded-lg"
+                        title="Editar Lead"
                     >
-                        <Edit size={14} />
+                        <Edit size={16} />
                     </button>
                     <button
-                        onClick={() => {
+                        onClick={(e) => {
+                            e.stopPropagation();
                             if (confirm('Deseja excluir este lead?')) {
-                                onDelete(lead.id)
+                                onDelete(lead.id);
                             }
                         }}
-                        className="p-1 text-gray-400 hover:text-red-600 transition-colors opacity-0 group-hover:opacity-100"
+                        className="p-2 text-gray-400 hover:text-red-600 transition-colors opacity-0 group-hover:opacity-100 bg-gray-50 rounded-lg"
+                        title="Excluir Lead"
                     >
-                        <Trash2 size={14} />
+                        <Trash2 size={16} />
                     </button>
-                    <div {...attributes} {...listeners} className="cursor-grab p-1">
-                        <GripVertical size={16} className="text-gray-400 flex-shrink-0" />
-                    </div>
                 </div>
             </div>
 
@@ -119,7 +158,7 @@ function SortableLeadCard({
             )}
 
             {/* Indicadores */}
-            <div className="flex items-center gap-2 mt-3">
+            <div className="flex items-center gap-2 mt-3 flex-wrap">
                 {lead.needs_followup && (
                     <span className="flex items-center gap-1 text-xs text-orange-600 bg-orange-50 px-2 py-0.5 rounded">
                         <AlertCircle size={10} />
@@ -131,12 +170,109 @@ function SortableLeadCard({
                         {lead.objecao_tipo}
                     </span>
                 )}
+                <ContractIndicator leadId={lead.id} />
             </div>
         </div>
     )
 }
 
-// Modal de Novo/Edição de Lead
+// Pequeno componente para checar e mostrar se é cliente antigo
+function ContractIndicator({ leadId }: { leadId: string }) {
+    const [hasContracts, setHasContracts] = useState(false)
+
+    useEffect(() => {
+        async function check() {
+            const { count } = await supabase
+                .from('contracts')
+                .select('*', { count: 'exact', head: true })
+                .eq('lead_id', leadId)
+
+            if (count && count > 0) setHasContracts(true)
+        }
+        check()
+    }, [leadId])
+
+    if (!hasContracts) return null
+
+    return (
+        <span className="text-[10px] font-bold text-blue-700 bg-blue-100/50 px-2 py-0.5 rounded flex items-center gap-1 border border-blue-200">
+            <History size={10} />
+            Cliente JAT
+        </span>
+    )
+}
+
+// Componente de Coluna Droppable
+function KanbanColumn({
+    column,
+    leads,
+    loading,
+    onEdit,
+    onDelete
+}: {
+    column: any,
+    leads: Lead[],
+    loading: boolean,
+    onEdit: (lead: Lead) => void,
+    onDelete: (id: string) => void
+}) {
+    const { setNodeRef } = useDroppable({
+        id: column.id,
+    });
+
+    const columnLeads = leads.filter(l => (l.status || 'novo') === column.id);
+
+    return (
+        <div className="flex flex-col w-80 h-full">
+            <div className={`${column.color} text-white px-5 py-3 rounded-t-xl shadow-sm shrink-0`}>
+                <div className="flex items-center justify-between">
+                    <span className="font-bold tracking-wide uppercase text-xs">{column.label}</span>
+                    <span className="bg-white/20 px-2 py-0.5 rounded text-xs font-bold">
+                        {columnLeads.length}
+                    </span>
+                </div>
+                <div className="text-xs text-white/80 mt-1 font-medium">
+                    R$ {columnLeads
+                        .reduce((sum, l) => sum + (l.last_margin || 0), 0)
+                        .toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </div>
+            </div>
+
+            <div
+                ref={setNodeRef}
+                className="bg-gray-50/80 border border-t-0 border-gray-100 rounded-b-xl p-3 flex-1 flex flex-col min-h-0"
+            >
+                <div className="flex-1 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-gray-200">
+                    <SortableContext
+                        id={column.id}
+                        items={columnLeads.map(l => l.id)}
+                        strategy={verticalListSortingStrategy}
+                    >
+                        <div className="space-y-3 min-h-[150px]">
+                            {loading ? (
+                                <div className="flex flex-col items-center justify-center py-10 gap-2">
+                                    <div className="w-8 h-8 border-4 border-gray-200 border-t-primary rounded-full animate-spin" />
+                                    <span className="text-xs text-gray-400">Carregando...</span>
+                                </div>
+                            ) : (
+                                columnLeads.map((lead) => (
+                                    <SortableLeadCard
+                                        key={lead.id}
+                                        lead={lead}
+                                        onEdit={onEdit}
+                                        onDelete={onDelete}
+                                    />
+                                ))
+                            )}
+                        </div>
+                    </SortableContext>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// Modal de Lead com Abas
 function LeadModal({
     isOpen,
     onClose,
@@ -148,143 +284,485 @@ function LeadModal({
     onSave: (lead: Partial<Lead>) => void
     lead?: Lead | null
 }) {
-    const [formData, setFormData] = useState({
-        name: '',
-        phone: '',
-        last_margin: '',
-        objecao_tipo: '',
-        needs_followup: false,
-        status: 'novo'
+    const [activeTab, setActiveTab] = useState('essencial')
+    const [formData, setFormData] = useState<Partial<Lead>>({})
+    const [contracts, setContracts] = useState<Contract[]>([])
+    const [loadingContracts, setLoadingContracts] = useState(false)
+    const [showNewContractForm, setShowNewContractForm] = useState(false)
+    const [newContract, setNewContract] = useState<Partial<Contract>>({
+        valor_total: 0,
+        banco_parceiro: '',
+        status: 'ativo',
+        data_assinatura: new Date().toISOString().split('T')[0]
     })
 
     useEffect(() => {
-        if (lead) {
-            setFormData({
-                name: lead.name || '',
-                phone: lead.phone || '',
-                last_margin: lead.last_margin?.toString() || '',
-                objecao_tipo: lead.objecao_tipo || '',
-                needs_followup: lead.needs_followup || false,
-                status: lead.status || 'novo'
-            })
+        if (lead && isOpen) {
+            setFormData(lead)
+            loadContracts(lead.id)
         } else {
             setFormData({
-                name: '',
-                phone: '',
-                last_margin: '',
-                objecao_tipo: '',
+                status: 'novo',
+                is_active: true,
                 needs_followup: false,
-                status: 'novo'
+                followup_count: 0,
+                last_margin: 0,
+                tem_filhos: false,
+                qtd_filhos: 0
             })
         }
+        setActiveTab('essencial')
     }, [lead, isOpen])
 
     if (!isOpen) return null
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault()
-        onSave({
-            ...lead,
-            name: formData.name || null,
-            phone: formData.phone,
-            last_margin: parseFloat(formData.last_margin) || null,
-            objecao_tipo: formData.objecao_tipo || null,
-            needs_followup: formData.needs_followup,
-            status: formData.status
-        })
+        onSave(formData)
         onClose()
     }
 
+    const loadContracts = async (leadId: string) => {
+        setLoadingContracts(true)
+        const { data, error } = await supabase
+            .from('contracts')
+            .select('*')
+            .eq('lead_id', leadId)
+            .order('data_assinatura', { ascending: false })
+
+        if (!error && data) {
+            setContracts(data)
+        }
+        setLoadingContracts(false)
+    }
+
+    const handleAddContract = async () => {
+        if (!lead || !newContract.valor_total || !newContract.banco_parceiro) return
+
+        const { data, error } = await supabase
+            .from('contracts')
+            .insert([{ ...newContract, lead_id: lead.id }])
+            .select()
+            .single()
+
+        if (!error && data) {
+            setContracts([data, ...contracts])
+            setShowNewContractForm(false)
+            setNewContract({
+                valor_total: 0,
+                banco_parceiro: '',
+                status: 'ativo',
+                data_assinatura: new Date().toISOString().split('T')[0]
+            })
+        }
+    }
+
+    const handleDeleteContract = async (id: string) => {
+        if (!confirm('Excluir este contrato permanentemente?')) return
+        const { error } = await supabase.from('contracts').delete().eq('id', id)
+        if (!error) {
+            setContracts(contracts.filter(c => c.id !== id))
+        }
+    }
+
+    const tabs = [
+        { id: 'essencial', label: 'Essencial', icon: Info },
+        { id: 'pessoal', label: 'Pessoal', icon: User },
+        { id: 'endereco', label: 'Endereço', icon: MapPin },
+        { id: 'bancario', label: 'Bancário', icon: CreditCard },
+        { id: 'historico_jat', label: 'Histórico JAT', icon: History },
+    ]
+
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-xl">
-                <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-xl font-bold text-primary">
-                        {lead ? 'Editar Lead' : 'Novo Lead'}
-                    </h2>
-                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <div className="bg-white rounded-xl w-full max-w-2xl shadow-xl max-h-[90vh] flex flex-col">
+                {/* Header */}
+                <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50 rounded-t-xl">
+                    <div>
+                        <h2 className="text-xl font-bold text-primary">
+                            {lead ? 'Editar Lead' : 'Novo Lead'}
+                        </h2>
+                        <p className="text-xs text-gray-500 mt-1">
+                            Preencha as informações do cliente para qualificação de crédito.
+                        </p>
+                    </div>
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-2 hover:bg-white rounded-full transition-colors">
                         <X size={20} />
                     </button>
                 </div>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Telefone *</label>
-                        <input
-                            type="tel"
-                            value={formData.phone}
-                            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
-                            required
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Nome</label>
-                        <input
-                            type="text"
-                            value={formData.name}
-                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
-                        />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Margem (R$)</label>
-                            <input
-                                type="number"
-                                value={formData.last_margin}
-                                onChange={(e) => setFormData({ ...formData, last_margin: e.target.value })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
-                                step="0.01"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                            <select
-                                value={formData.status}
-                                onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
-                            >
-                                {KANBAN_COLUMNS.map(col => (
-                                    <option key={col.id} value={col.id}>{col.label}</option>
-                                ))}
-                            </select>
-                        </div>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Objeção</label>
-                        <input
-                            type="text"
-                            value={formData.objecao_tipo}
-                            onChange={(e) => setFormData({ ...formData, objecao_tipo: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
-                        />
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <input
-                            type="checkbox"
-                            id="needs_followup"
-                            checked={formData.needs_followup}
-                            onChange={(e) => setFormData({ ...formData, needs_followup: e.target.checked })}
-                            className="rounded text-primary focus:ring-primary"
-                        />
-                        <label htmlFor="needs_followup" className="text-sm text-gray-700">Necessita Follow-up</label>
-                    </div>
-                    <div className="flex gap-3 pt-2">
+
+                {/* Tabs Navigation */}
+                <div className="flex border-b border-gray-100 px-6 bg-white overflow-x-auto">
+                    {tabs.map((tab) => (
                         <button
-                            type="button"
-                            onClick={onClose}
-                            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id)}
+                            className={`flex items-center gap-2 py-4 px-4 border-b-2 font-medium text-sm transition-colors whitespace-nowrap
+                ${activeTab === tab.id
+                                    ? 'border-primary text-primary'
+                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-200'}`}
                         >
-                            Cancelar
+                            <tab.icon size={16} />
+                            {tab.label}
                         </button>
-                        <button
-                            type="submit"
-                            className="flex-1 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark"
-                        >
-                            Salvar
-                        </button>
-                    </div>
+                    ))}
+                </div>
+
+                {/* Form Body */}
+                <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6">
+                    {activeTab === 'essencial' && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="col-span-1 md:col-span-2">
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Nome Completo</label>
+                                <input
+                                    type="text"
+                                    value={formData.name || ''}
+                                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                                    placeholder="Ex: João da Silva"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Telefone *</label>
+                                <input
+                                    type="tel"
+                                    value={formData.phone || ''}
+                                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                                    required
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Status do Lead</label>
+                                <select
+                                    value={formData.status || 'novo'}
+                                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                                >
+                                    {KANBAN_COLUMNS.map(col => (
+                                        <option key={col.id} value={col.id}>{col.label}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Margem Disponível (R$)</label>
+                                <input
+                                    type="number"
+                                    value={formData.last_margin || ''}
+                                    onChange={(e) => setFormData({ ...formData, last_margin: parseFloat(e.target.value) || 0 })}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                                    step="0.01"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Objeção</label>
+                                <input
+                                    type="text"
+                                    value={formData.objecao_tipo || ''}
+                                    onChange={(e) => setFormData({ ...formData, objecao_tipo: e.target.value })}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'pessoal' && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Data de Nascimento</label>
+                                <input
+                                    type="date"
+                                    value={formData.data_nascimento || ''}
+                                    onChange={(e) => setFormData({ ...formData, data_nascimento: e.target.value })}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Estado Civil</label>
+                                <select
+                                    value={formData.estado_civil || ''}
+                                    onChange={(e) => setFormData({ ...formData, estado_civil: e.target.value })}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                                >
+                                    <option value="">Selecione...</option>
+                                    <option value="solteiro">Solteiro(a)</option>
+                                    <option value="casado">Casado(a)</option>
+                                    <option value="divorciado">Divorciado(a)</option>
+                                    <option value="viuvo">Viúvo(a)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Profissão</label>
+                                <input
+                                    type="text"
+                                    value={formData.profissao || ''}
+                                    onChange={(e) => setFormData({ ...formData, profissao: e.target.value })}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Renda Mensal (R$)</label>
+                                <input
+                                    type="number"
+                                    value={formData.renda_mensal || ''}
+                                    onChange={(e) => setFormData({ ...formData, renda_mensal: parseFloat(e.target.value) || 0 })}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                                    step="0.01"
+                                />
+                            </div>
+                            <div className="flex items-center gap-4 mt-2">
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="checkbox"
+                                        id="tem_filhos"
+                                        checked={formData.tem_filhos || false}
+                                        onChange={(e) => setFormData({ ...formData, tem_filhos: e.target.checked })}
+                                        className="rounded text-primary"
+                                    />
+                                    <label htmlFor="tem_filhos" className="text-sm text-gray-700">Tem Filhos?</label>
+                                </div>
+                                {formData.tem_filhos && (
+                                    <div className="flex-1">
+                                        <input
+                                            type="number"
+                                            value={formData.qtd_filhos || 0}
+                                            onChange={(e) => setFormData({ ...formData, qtd_filhos: parseInt(e.target.value) || 0 })}
+                                            className="w-full px-2 py-1 border border-gray-300 rounded-md outline-none text-sm"
+                                            placeholder="Qtd"
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'endereco' && (
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">CEP</label>
+                                <input
+                                    type="text"
+                                    value={formData.cep || ''}
+                                    onChange={(e) => setFormData({ ...formData, cep: e.target.value })}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                                    placeholder="00000-000"
+                                />
+                            </div>
+                            <div className="md:col-span-2">
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Logradouro</label>
+                                <input
+                                    type="text"
+                                    value={formData.logradouro || ''}
+                                    onChange={(e) => setFormData({ ...formData, logradouro: e.target.value })}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Número</label>
+                                <input
+                                    type="text"
+                                    value={formData.numero || ''}
+                                    onChange={(e) => setFormData({ ...formData, numero: e.target.value })}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                                />
+                            </div>
+                            <div className="md:col-span-2">
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Bairro</label>
+                                <input
+                                    type="text"
+                                    value={formData.bairro || ''}
+                                    onChange={(e) => setFormData({ ...formData, bairro: e.target.value })}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                                />
+                            </div>
+                            <div className="md:col-span-2">
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Cidade</label>
+                                <input
+                                    type="text"
+                                    value={formData.cidade || ''}
+                                    onChange={(e) => setFormData({ ...formData, cidade: e.target.value })}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
+                                <input
+                                    type="text"
+                                    value={formData.estado || ''}
+                                    onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                                    maxLength={2}
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'bancario' && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Data Último Empréstimo</label>
+                                <input
+                                    type="date"
+                                    value={formData.ultimo_emprestimo_data || ''}
+                                    onChange={(e) => setFormData({ ...formData, ultimo_emprestimo_data: e.target.value })}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Valor do Empréstimo (R$)</label>
+                                <input
+                                    type="number"
+                                    value={formData.ultimo_emprestimo_valor || ''}
+                                    onChange={(e) => setFormData({ ...formData, ultimo_emprestimo_valor: parseFloat(e.target.value) || 0 })}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                                    step="0.01"
+                                />
+                            </div>
+                            <div className="md:col-span-2">
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Banco Origem</label>
+                                <input
+                                    type="text"
+                                    value={formData.ultimo_emprestimo_banco || ''}
+                                    onChange={(e) => setFormData({ ...formData, ultimo_emprestimo_banco: e.target.value })}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                                    placeholder="Ex: Banco do Brasil, Itaú, Bradesco"
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'historico_jat' && (
+                        <div className="space-y-6">
+                            {!lead ? (
+                                <div className="text-center py-10 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
+                                    <History className="mx-auto text-gray-300 mb-2" size={40} />
+                                    <p className="text-gray-500 text-sm">Salve o lead primeiro para adicionar contratos.</p>
+                                </div>
+                            ) : (
+                                <>
+                                    <div className="flex items-center justify-between">
+                                        <h3 className="text-sm font-bold text-gray-800 uppercase tracking-wider">Histórico de Fechamentos</h3>
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowNewContractForm(!showNewContractForm)}
+                                            className="text-xs bg-primary/10 text-primary px-3 py-1.5 rounded-lg font-bold hover:bg-primary/20 transition-colors flex items-center gap-1"
+                                        >
+                                            <Plus size={14} />
+                                            {showNewContractForm ? 'Cancelar' : 'Novo Contrato'}
+                                        </button>
+                                    </div>
+
+                                    {showNewContractForm && (
+                                        <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 animate-in fade-in slide-in-from-top-2">
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div className="col-span-1">
+                                                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Valor Total (R$)</label>
+                                                    <input
+                                                        type="number"
+                                                        value={newContract.valor_total || ''}
+                                                        onChange={(e) => setNewContract({ ...newContract, valor_total: parseFloat(e.target.value) || 0 })}
+                                                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg outline-none focus:ring-1 focus:ring-primary"
+                                                        placeholder="0,00"
+                                                    />
+                                                </div>
+                                                <div className="col-span-1">
+                                                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Banco Parceiro</label>
+                                                    <input
+                                                        type="text"
+                                                        value={newContract.banco_parceiro || ''}
+                                                        onChange={(e) => setNewContract({ ...newContract, banco_parceiro: e.target.value })}
+                                                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg outline-none focus:ring-1 focus:ring-primary"
+                                                        placeholder="Ex: Safra"
+                                                    />
+                                                </div>
+                                                <div className="col-span-1">
+                                                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Data Assinatura</label>
+                                                    <input
+                                                        type="date"
+                                                        value={newContract.data_assinatura || ''}
+                                                        onChange={(e) => setNewContract({ ...newContract, data_assinatura: e.target.value })}
+                                                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg outline-none focus:ring-1 focus:ring-primary"
+                                                    />
+                                                </div>
+                                                <div className="col-span-1 flex items-end">
+                                                    <button
+                                                        type="button"
+                                                        onClick={handleAddContract}
+                                                        className="w-full py-2 bg-primary text-white rounded-lg text-sm font-bold shadow-sm"
+                                                    >
+                                                        Adicionar
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div className="space-y-3">
+                                        {loadingContracts ? (
+                                            <div className="flex justify-center p-8">
+                                                <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                                            </div>
+                                        ) : contracts.length === 0 ? (
+                                            <div className="text-center py-8 text-gray-400 text-xs italic">
+                                                Nenhum contrato fechado com este cliente ainda.
+                                            </div>
+                                        ) : (
+                                            contracts.map((contract) => (
+                                                <div key={contract.id} className="flex items-center gap-4 p-3 bg-white border border-gray-100 rounded-xl hover:shadow-sm transition-shadow">
+                                                    <div className="bg-green-100/50 p-2 rounded-lg text-green-600">
+                                                        <TrendingUp size={18} />
+                                                    </div>
+                                                    <div className="flex-1">
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="text-sm font-bold text-gray-800">
+                                                                R$ {contract.valor_total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                                            </span>
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-[10px] font-bold bg-blue-50 text-blue-600 px-2 py-0.5 rounded uppercase">
+                                                                    {contract.banco_parceiro}
+                                                                </span>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleDeleteContract(contract.id)}
+                                                                    className="text-gray-300 hover:text-red-500 transition-colors"
+                                                                >
+                                                                    <Trash size={12} />
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex items-center gap-2 mt-1 text-[10px] text-gray-500 font-medium">
+                                                            <Calendar size={10} />
+                                                            {new Date(contract.data_assinatura).toLocaleDateString('pt-BR')}
+                                                            <span className="mx-1">•</span>
+                                                            <span className="capitalize">{contract.status}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    )}
                 </form>
+
+                {/* Action Buttons */}
+                <div className="p-6 border-t border-gray-100 bg-gray-50/50 flex gap-3 rounded-b-xl">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-white transition-colors font-medium"
+                    >
+                        Cancelar
+                    </button>
+                    <button
+                        onClick={handleSubmit}
+                        className="flex-1 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors font-medium shadow-sm"
+                    >
+                        Salvar Alterações
+                    </button>
+                </div>
             </div>
         </div>
     )
@@ -298,7 +776,11 @@ export default function LeadsPage() {
     const [editingLead, setEditingLead] = useState<Lead | null>(null)
 
     const sensors = useSensors(
-        useSensor(PointerSensor),
+        useSensor(PointerSensor, {
+            activationConstraint: {
+                distance: 8,
+            },
+        }),
         useSensor(KeyboardSensor, {
             coordinateGetter: sortableKeyboardCoordinates,
         })
@@ -416,30 +898,37 @@ export default function LeadsPage() {
             .eq('id', active.id)
 
         if (error) {
-            // Reverter se der erro
-            loadLeads()
+            loadLeads() // Reverte se der erro
         }
     }
 
     return (
-        <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold text-foreground">Gestão de Leads</h1>
-                    <p className="text-sm text-gray-500">
-                        {leads.length} leads | R$ {leads.reduce((sum, l) => sum + (l.last_margin || 0), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} em margem
-                    </p>
+        <div className="flex flex-col h-[calc(100vh-64px)] -m-8 p-8 overflow-hidden w-[calc(100%+64px)]">
+            {/* Header Fixo */}
+            <div className="z-10 bg-gray-50/80 backdrop-blur-md pb-6 shrink-0 mr-8">
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h1 className="text-2xl font-bold text-foreground">Gestão de Leads</h1>
+                        <div className="flex items-center gap-2 mt-1">
+                            <span className="text-sm text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+                                {leads.length} leads ativos
+                            </span>
+                            <span className="text-sm font-semibold text-green-600 bg-green-50 px-2 py-0.5 rounded">
+                                R$ {leads.reduce((sum, l) => sum + (l.last_margin || 0), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} em margem
+                            </span>
+                        </div>
+                    </div>
+                    <button
+                        onClick={() => {
+                            setEditingLead(null)
+                            setIsModalOpen(true)
+                        }}
+                        className="flex items-center gap-2 px-6 py-3 bg-accent text-white rounded-xl hover:bg-accent-dark transition-all shadow-md hover:shadow-lg active:scale-95 font-semibold"
+                    >
+                        <Plus size={20} />
+                        Cadastrar Lead
+                    </button>
                 </div>
-                <button
-                    onClick={() => {
-                        setEditingLead(null)
-                        setIsModalOpen(true)
-                    }}
-                    className="flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent-dark transition-colors"
-                >
-                    <Plus size={20} />
-                    Novo Lead
-                </button>
             </div>
 
             <DndContext
@@ -449,60 +938,31 @@ export default function LeadsPage() {
                 onDragOver={handleDragOver}
                 onDragEnd={handleDragEnd}
             >
-                <div className="flex gap-4 overflow-x-auto pb-4">
-                    {KANBAN_COLUMNS.map((column) => (
-                        <div key={column.id} className="flex-shrink-0 w-80">
-                            <div className={`${column.color} text-white px-4 py-2 rounded-t-lg`}>
-                                <div className="flex items-center justify-between">
-                                    <span className="font-medium">{column.label}</span>
-                                    <span className="bg-white/20 px-2 py-0.5 rounded text-sm">
-                                        {leads.filter(l => (l.status || 'novo') === column.id).length}
-                                    </span>
-                                </div>
-                                <div className="text-xs text-white/70 mt-1">
-                                    R$ {leads.filter(l => (l.status || 'novo') === column.id)
-                                        .reduce((sum, l) => sum + (l.last_margin || 0), 0)
-                                        .toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                </div>
-                            </div>
-
-                            <div className="bg-gray-100 rounded-b-lg p-3 min-h-[500px] flex flex-col gap-3">
-                                <SortableContext
-                                    id={column.id}
-                                    items={leads.filter(l => (l.status || 'novo') === column.id).map(l => l.id)}
-                                    strategy={verticalListSortingStrategy}
-                                >
-                                    <div className="flex-1 space-y-3" id={column.id}>
-                                        {loading ? (
-                                            <div className="text-center text-gray-400 py-8">Carregando...</div>
-                                        ) : (
-                                            leads
-                                                .filter(l => (l.status || 'novo') === column.id)
-                                                .map((lead) => (
-                                                    <SortableLeadCard
-                                                        key={lead.id}
-                                                        lead={lead}
-                                                        onEdit={(l) => {
-                                                            setEditingLead(l)
-                                                            setIsModalOpen(true)
-                                                        }}
-                                                        onDelete={handleDeleteLead}
-                                                    />
-                                                ))
-                                        )}
-                                    </div>
-                                </SortableContext>
-                            </div>
-                        </div>
-                    ))}
+                <div className="flex-1 overflow-x-auto overflow-y-hidden pb-4 scrollbar-thin scrollbar-thumb-gray-300">
+                    <div className="flex gap-6 h-full min-w-max">
+                        {KANBAN_COLUMNS.map((column) => (
+                            <KanbanColumn
+                                key={column.id}
+                                column={column}
+                                leads={leads}
+                                loading={loading}
+                                onEdit={(l) => {
+                                    setEditingLead(l)
+                                    setIsModalOpen(true)
+                                }}
+                                onDelete={handleDeleteLead}
+                            />
+                        ))}
+                    </div>
                 </div>
 
                 <DragOverlay>
                     {activeId ? (
-                        <div className="bg-white rounded-lg shadow-xl p-4 border-l-4 border-l-primary scale-105 rotate-2 opacity-90">
-                            <h4 className="font-medium text-gray-900 text-sm">
-                                {leads.find(l => l.id === activeId)?.name || 'Carregando...'}
+                        <div className="bg-white rounded-lg shadow-2xl p-4 border-l-4 border-l-primary scale-105 rotate-2 opacity-95">
+                            <h4 className="font-bold text-gray-900 text-sm">
+                                {leads.find(l => l.id === activeId)?.name || 'Lead Selecionado'}
                             </h4>
+                            <p className="text-xs text-gray-500 mt-1">{leads.find(l => l.id === activeId)?.phone}</p>
                         </div>
                     ) : null}
                 </DragOverlay>
