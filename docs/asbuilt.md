@@ -28,12 +28,13 @@ Centro de comando para correspondente bancário, focado em gestão de leads e co
 
 ### FASE 2: Kanban e Operacional
 **Status:** 🚧 Em Andamento
-**Conclusão:** 50% (2/4 subtasks)
+**Conclusão:** 80% (4/5 subtasks)
 **Subtasks:**
 - [x] Schema do Banco de Dados (Leads adaptado)
-- [x] Componente Kanban (Colunas e Cards)
-- [ ] Drag & Drop funcional
-- [ ] CRUD completo de leads
+- [x] Componente Kanban (Estrutura Visual)
+- [x] Interatividade Drag & Drop funcional
+- [x] CRUD de leads (Edição/Exclusão)
+- [ ] Refinamentos de UX e Filtros
 
 ---
 
@@ -41,31 +42,34 @@ Centro de comando para correspondente bancário, focado em gestão de leads e co
 - **Middleware**: Simplificado para permitir acesso com autenticação (role check pendente de ajuste na RLS).
 - **Layout**: Sidebar com largura fixa (256px) via inline styles para garantir compatibilidade com Tailwind v4.
 - **Sessão**: Autenticação Supabase SSR configurada com `createBrowserClient`.
-- **Kanban**: Integrado com a tabela de leads existente (campos: `name`, `phone`, `last_margin`, `status`, `needs_followup`).
+- **Kanban**: Implementado suporte a Drag & Drop (@dnd-kit) para movimentação de leads entre colunas de status.
+- **Correções**: Resolvido erro de hidratação no login usando Suspense Boundary e corrigido bug de layout do Tailwind v4 (Dashboard fixed width).
 
 ---
 
 ## Histórico de Sessões
 
-### Sessão 2026-02-08 - Tarde
-- Inicialização do projeto e GitFlow.
-- Setup básico do Supabase e Tailwind.
-
 ### Sessão 2026-02-08 - Noite
 **Trabalho Realizado:**
 - ✅ Implementação de segurança (Middleware) e Layout (Sidebar).
 - ✅ Página de Login funcional com Supabase SSR.
-- ✅ Renomeação da marca para **JATCAIXAAQUI** (substituindo Pepper Control).
+- ✅ Renomeação da marca para **JATCAIXAAQUI**.
 - ✅ Criação do Kanban Board adaptado à tabela de leads existente.
-- ✅ Correção de BUG crítico: Build error no `useSearchParams` (adicionado Suspense).
-- ✅ Correção de BUG crítico: Layout esmagado no Dashboard (ajuste de largura do Sidebar).
-- ✅ SQL fornecido para expansão da tabela de leads e padronização de status.
+- ✅ Correção de BUG crítico: Build error no `useSearchParams` (Suspense).
+- ✅ Correção de BUG crítico: Layout esmagado no Dashboard (width fix).
+
+### Sessão 2026-02-08 (Noite - Parte II)
+**Trabalho Realizado:**
+- ✅ Conclusão oficial da Fase 1 e Rebranding JATCAIXAAQUI.
+- ✅ Implementação de Drag & Drop interativo no Kanban com persistência no Supabase.
+- ✅ Criação do Modal de Edição (CRUD completo: Criar, Editar, Excluir).
+- ✅ Integração de indicadores de Follow-up e Objeções nos cards.
 
 **Próximos Passos:**
-- Implementação de Drag & Drop funcional no Kanban.
-- Finalizar o CRUD (Edição e Exclusão) de leads.
+- Refinamento do Drag & Drop (animações e UX).
+- Deploy final para Vercel.
 
 ---
 
-**Última Atualização:** 2026-02-08 às 22:00
+**Última Atualização:** 2026-02-08 às 22:15
 **Atualizado por:** J.A.R.V.I.S. (automated)
