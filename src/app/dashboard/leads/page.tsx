@@ -1,54 +1,81 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Plus, DollarSign, User, GripVertical } from 'lucide-react'
+import { Plus, Phone, User, GripVertical, AlertCircle, Clock } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
-// Tipos
+// Tipos baseados na tabela existente
 interface Lead {
     id: string
-    title: string
-    client_name: string
-    value: number
-    status: string
-    priority: string
+    phone: string
+    name: string | null
+    last_margin: number | null
+    status: string | null
+    last_summary: string | null
+    is_active: boolean | null
+    last_interaction: string | null
+    created_at: string | null
+    needs_followup: boolean | null
+    objecao_tipo: string | null
+    followup_count: number | null
 }
 
-// Status do Kanban
+// Status do Kanban - alinhado com banco de dados
 const KANBAN_COLUMNS = [
-    { id: 'prospeccao', label: 'Prospecção', color: 'bg-gray-500' },
-    { id: 'analise', label: 'Em Análise', color: 'bg-blue-500' },
-    { id: 'aprovado', label: 'Aprovado', color: 'bg-yellow-500' },
-    { id: 'assinado', label: 'Assinado', color: 'bg-purple-500' },
-    { id: 'pago', label: 'Pago', color: 'bg-green-500' },
+    { id: 'novo', label: 'Novo', color: 'bg-gray-500' },
+    { id: 'em_atendimento', label: 'Em Atendimento', color: 'bg-blue-500' },
+    { id: 'negociando', label: 'Negociando', color: 'bg-yellow-500' },
+    { id: 'aprovado', label: 'Aprovado', color: 'bg-purple-500' },
+    { id: 'fechado', label: 'Fechado', color: 'bg-green-500' },
+    { id: 'perdido', label: 'Perdido', color: 'bg-red-500' },
 ]
 
 // Componente Card do Lead
 function LeadCard({ lead }: { lead: Lead }) {
-    const priorityColors = {
-        baixa: 'border-l-gray-400',
-        media: 'border-l-yellow-400',
-        alta: 'border-l-red-500',
-    }
-
     return (
-        <div
-            className={`bg-white rounded-lg shadow-sm p-4 border-l-4 ${priorityColors[lead.priority as keyof typeof priorityColors] || 'border-l-gray-400'} hover:shadow-md transition-shadow cursor-grab`}
-        >
+        <div className="bg-white rounded-lg shadow-sm p-4 hover:shadow-md transition-shadow cursor-grab border-l-4 border-l-primary">
             <div className="flex items-start justify-between gap-2">
-                <div className="flex-1">
-                    <h4 className="font-medium text-gray-900 text-sm">{lead.title}</h4>
+                <div className="flex-1 min-w-0">
+                    <h4 className="font-medium text-gray-900 text-sm truncate">
+                        {lead.name || 'Sem nome'}
+                    </h4>
                     <div className="flex items-center gap-1 mt-1 text-gray-500 text-xs">
-                        <User size={12} />
-                        <span>{lead.client_name}</span>
+                        <Phone size={12} />
+                        <span>{lead.phone}</span>
                     </div>
                 </div>
-                <GripVertical size={16} className="text-gray-400" />
+                <GripVertical size={16} className="text-gray-400 flex-shrink-0" />
             </div>
-            {lead.value > 0 && (
-                <div className="flex items-center gap-1 mt-3 text-green-600 font-semibold text-sm">
-                    <DollarSign size={14} />
-                    <span>{lead.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+
+            {/* Margem */}
+            {lead.last_margin && lead.last_margin > 0 && (
+                <div className="mt-2 text-sm font-semibold text-green-600">
+                    R$ {lead.last_margin.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </div>
+            )}
+
+            {/* Indicadores */}
+            <div className="flex items-center gap-2 mt-3">
+                {lead.needs_followup && (
+                    <span className="flex items-center gap-1 text-xs text-orange-600 bg-orange-50 px-2 py-0.5 rounded">
+                        <AlertCircle size={10} />
+                        Follow-up
+                    </span>
+                )}
+                {lead.objecao_tipo && (
+                    <span className="text-xs text-red-600 bg-red-50 px-2 py-0.5 rounded truncate max-w-[100px]">
+                        {lead.objecao_tipo}
+                    </span>
+                )}
+            </div>
+
+            {/* Última interação */}
+            {lead.last_interaction && (
+                <div className="flex items-center gap-1 mt-2 text-xs text-gray-400">
+                    <Clock size={10} />
+                    <span>
+                        {new Date(lead.last_interaction).toLocaleDateString('pt-BR')}
+                    </span>
                 </div>
             )}
         </div>
@@ -66,10 +93,9 @@ function NewLeadModal({
     onSave: (lead: Partial<Lead>) => void
 }) {
     const [formData, setFormData] = useState({
-        title: '',
-        client_name: '',
-        value: '',
-        priority: 'media',
+        name: '',
+        phone: '',
+        last_margin: '',
     })
 
     if (!isOpen) return null
@@ -77,11 +103,15 @@ function NewLeadModal({
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault()
         onSave({
-            ...formData,
-            value: parseFloat(formData.value) || 0,
-            status: 'prospeccao',
+            name: formData.name || null,
+            phone: formData.phone,
+            last_margin: parseFloat(formData.last_margin) || null,
+            status: 'novo',
+            is_active: true,
+            needs_followup: false,
+            followup_count: 0,
         })
-        setFormData({ title: '', client_name: '', value: '', priority: 'media' })
+        setFormData({ name: '', phone: '', last_margin: '' })
         onClose()
     }
 
@@ -91,46 +121,34 @@ function NewLeadModal({
                 <h2 className="text-xl font-bold text-primary mb-4">Novo Lead</h2>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Título</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Telefone *</label>
                         <input
-                            type="text"
-                            value={formData.title}
-                            onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                            type="tel"
+                            value={formData.phone}
+                            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                            placeholder="(00) 00000-0000"
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                             required
                         />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Nome do Cliente</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Nome</label>
                         <input
                             type="text"
-                            value={formData.client_name}
-                            onChange={(e) => setFormData({ ...formData, client_name: e.target.value })}
+                            value={formData.name}
+                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                            required
                         />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Valor (R$)</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Margem (R$)</label>
                         <input
                             type="number"
-                            value={formData.value}
-                            onChange={(e) => setFormData({ ...formData, value: e.target.value })}
+                            value={formData.last_margin}
+                            onChange={(e) => setFormData({ ...formData, last_margin: e.target.value })}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                             step="0.01"
                         />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Prioridade</label>
-                        <select
-                            value={formData.priority}
-                            onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                        >
-                            <option value="baixa">Baixa</option>
-                            <option value="media">Média</option>
-                            <option value="alta">Alta</option>
-                        </select>
                     </div>
                     <div className="flex gap-3 pt-2">
                         <button
@@ -177,11 +195,9 @@ export default function LeadsPage() {
 
     // Salvar novo lead
     const handleSaveLead = async (leadData: Partial<Lead>) => {
-        const { data: { user } } = await supabase.auth.getUser()
-
         const { data, error } = await supabase
             .from('leads')
-            .insert([{ ...leadData, user_id: user?.id }])
+            .insert([leadData])
             .select()
             .single()
 
@@ -192,7 +208,13 @@ export default function LeadsPage() {
 
     // Agrupar leads por status
     const getLeadsByStatus = (status: string) => {
-        return leads.filter((lead) => lead.status === status)
+        return leads.filter((lead) => (lead.status || 'novo') === status)
+    }
+
+    // Calcular total de margem por coluna
+    const getTotalMargin = (status: string) => {
+        return getLeadsByStatus(status)
+            .reduce((sum, lead) => sum + (lead.last_margin || 0), 0)
     }
 
     return (
@@ -201,7 +223,9 @@ export default function LeadsPage() {
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold text-foreground">Gestão de Leads</h1>
-                    <p className="text-sm text-gray-500">Arraste os cards para atualizar o status</p>
+                    <p className="text-sm text-gray-500">
+                        {leads.length} leads | R$ {leads.reduce((sum, l) => sum + (l.last_margin || 0), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} em margem
+                    </p>
                 </div>
                 <button
                     onClick={() => setIsModalOpen(true)}
@@ -217,11 +241,16 @@ export default function LeadsPage() {
                 {KANBAN_COLUMNS.map((column) => (
                     <div key={column.id} className="flex-shrink-0 w-72">
                         {/* Column Header */}
-                        <div className={`${column.color} text-white px-4 py-2 rounded-t-lg flex items-center justify-between`}>
-                            <span className="font-medium">{column.label}</span>
-                            <span className="bg-white/20 px-2 py-0.5 rounded text-sm">
-                                {getLeadsByStatus(column.id).length}
-                            </span>
+                        <div className={`${column.color} text-white px-4 py-2 rounded-t-lg`}>
+                            <div className="flex items-center justify-between">
+                                <span className="font-medium">{column.label}</span>
+                                <span className="bg-white/20 px-2 py-0.5 rounded text-sm">
+                                    {getLeadsByStatus(column.id).length}
+                                </span>
+                            </div>
+                            <div className="text-xs text-white/70 mt-1">
+                                R$ {getTotalMargin(column.id).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            </div>
                         </div>
 
                         {/* Column Content */}

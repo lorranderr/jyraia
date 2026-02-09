@@ -11,7 +11,7 @@ export default function DashboardLayout({
             <Sidebar />
 
             {/* Main Content Area */}
-            <div className="ml-64 min-h-screen flex flex-col">
+            <div className="min-h-screen flex flex-col" style={{ marginLeft: '256px' }}>
                 {/* Content */}
                 <main className="flex-1 p-8">
                     {children}

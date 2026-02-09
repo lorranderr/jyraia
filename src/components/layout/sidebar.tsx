@@ -22,7 +22,7 @@ export function Sidebar() {
     }
 
     return (
-        <aside className="fixed left-0 top-0 h-screen w-64 bg-primary flex flex-col">
+        <aside className="fixed left-0 top-0 h-screen bg-primary flex flex-col" style={{ width: '256px' }}>
             {/* Logo/Header */}
             <div className="p-6 border-b border-primary-light">
                 <h1 className="text-xl font-bold text-white">
