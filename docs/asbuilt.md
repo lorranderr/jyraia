@@ -55,6 +55,7 @@ Centro de comando para correspondente bancário, focado em gestão de leads e co
 - **Middleware**: Simplificado para permitir acesso com autenticação.
 - **Layout**: Sidebar com largura fixa (256px) via inline styles.
 - **Sessão**: Autenticação Supabase SSR com `createBrowserClient`.
+- **Navegação**: Login → `/dashboard` (Kanban de Leads direto). Página de Dashboard de cards removida por redundância.
 - **Kanban**: Suporte a Drag & Drop (@dnd-kit) e altura fixa para garantir que a barra de rolagem horizontal esteja sempre visível no rodapé da área de trabalho.
 - **Cadastro Detalhado**: Modal organizado em 4 abas (Essencial, Pessoal, Endereço, Bancário) para suportar dados bancários completos e histórico de empréstimos.
 - **Contratos**: Utiliza relação 1:N entre `leads` e `contracts`.
@@ -92,7 +93,14 @@ Centro de comando para correspondente bancário, focado em gestão de leads e co
 - ✅ Reestruturação de colunas: Novo Lead, Negociando, Aprovado, Fechado, Perdido.
 - ✅ Resgate automático: leads sem status ou com status antigo agora caem em 'Novo Lead'.
 
+### Sessão 2026-02-10 - Noite
+**Trabalho Realizado:**
+- ✅ Remoção da página Dashboard (cards redundantes com o Kanban).
+- ✅ Kanban de Leads promovido para tela principal (`/dashboard`).
+- ✅ Sidebar atualizada: item "Dashboard" removido, "Leads" agora é o primeiro item.
+- ✅ Pasta `dashboard/leads/` removida, conteúdo movido para `dashboard/page.tsx`.
+
 ---
 
-**Última Atualização:** 2026-02-10 às 00:35
+**Última Atualização:** 2026-02-10 às 18:16
 **Atualizado por:** J.A.R.V.I.S. (automated)

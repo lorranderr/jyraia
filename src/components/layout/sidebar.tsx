@@ -2,13 +2,12 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Users, Settings, LogOut } from 'lucide-react'
+import { Users, Settings, LogOut } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 
 const menuItems = [
-    { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-    { href: '/dashboard/leads', icon: Users, label: 'Leads' },
+    { href: '/dashboard', icon: Users, label: 'Leads' },
     { href: '/dashboard/settings', icon: Settings, label: 'Configurações' },
 ]
 
