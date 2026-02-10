@@ -98,9 +98,17 @@ Centro de comando para correspondente bancário, focado em gestão de leads e co
 - ✅ Remoção da página Dashboard (cards redundantes com o Kanban).
 - ✅ Kanban de Leads promovido para tela principal (`/dashboard`).
 - ✅ Sidebar atualizada: item "Dashboard" removido, "Leads" agora é o primeiro item.
-- ✅ Pasta `dashboard/leads/` removida, conteúdo movido para `dashboard/page.tsx`.
+- ✅ Responsividade mobile completa: sidebar drawer com hamburger, layout adaptável, modal fullscreen, filtros 2 colunas.
+- ✅ Fix dark mode: removido override que causava texto invisível nos inputs em celulares com modo escuro.
+- ✅ **Feature: Campanhas WhatsApp** — disparo em massa via Evolution API:
+  - API Route server-side (token protegido, delay 3s entre disparos)
+  - Página `/dashboard/campanhas` com textarea, filtros, preview e relatório
+  - Suporte a variável `{nome}` para personalização
+  - Filtros: banco, período, margem mínima, status do lead
+  - Lista de destinatários com checkbox individual
 
 ---
 
-**Última Atualização:** 2026-02-10 às 18:16
+**Última Atualização:** 2026-02-10 às 20:20
 **Atualizado por:** J.A.R.V.I.S. (automated)
+
