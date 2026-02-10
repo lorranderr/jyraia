@@ -37,6 +37,7 @@ Centro de comando para correspondente bancário, focado em gestão de leads e co
 - [x] CRUD completo de leads
 - [x] Expansão do Schema de Leads (Campos Bancários/Pessoais)
 - [x] Interface de Modal com Sistema de Abas (Tabs)
+- [x] Filtros avançados e busca na tela de leads
 - [ ] Drag & Drop funcional (Ajustes de UX)
 
 ### FASE 4: Histórico de Contratos
@@ -80,7 +81,18 @@ Centro de comando para correspondente bancário, focado em gestão de leads e co
 - Filtros avançados e busca na tela de leads.
 - Ativação do botão de WhatsApp automático.
 
+### Sessão 2026-02-10 - Madrugada
+**Trabalho Realizado:**
+- ✅ Implementação de redirecionamento para o login na página inicial.
+- ✅ Sistema de busca e filtros avançados no Dashboard de Leads.
+- ✅ Expansão do cadastro de leads: adição de campos de CPF, RG, Órgão Emissor e nomes dos pais.
+- ✅ Refinamento de busca: focada exclusivamente em Nome, Telefone e CPF (com normalização).
+- ✅ Conexão do Dashboard com dados reais do Supabase (contagem automática).
+- ✅ Sincronização definitiva: correção total de divergências entre Kanban e Dashboard.
+- ✅ Reestruturação de colunas: Novo Lead, Negociando, Aprovado, Fechado, Perdido.
+- ✅ Resgate automático: leads sem status ou com status antigo agora caem em 'Novo Lead'.
+
 ---
 
-**Última Atualização:** 2026-02-08 às 22:15
+**Última Atualização:** 2026-02-10 às 00:35
 **Atualizado por:** J.A.R.V.I.S. (automated)

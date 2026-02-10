@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react'
 import {
     Plus, Phone, User, AlertCircle, Clock,
     Edit, Trash2, X, MapPin, CreditCard, FileText, Info,
-    History, Briefcase, TrendingUp, Calendar, Trash
+    History, Briefcase, TrendingUp, Calendar, Trash,
+    Search, Filter, XCircle
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import {
@@ -56,6 +57,11 @@ interface Lead {
     ultimo_emprestimo_data: string | null
     ultimo_emprestimo_valor: number | null
     ultimo_emprestimo_banco: string | null
+    cpf: string | null
+    rg: string | null
+    rg_orgao: string | null
+    nome_pai: string | null
+    nome_mae: string | null
 }
 
 interface Contract {
@@ -73,8 +79,7 @@ interface Contract {
 }
 
 const KANBAN_COLUMNS = [
-    { id: 'novo', label: 'Novo', color: 'bg-gray-500' },
-    { id: 'em_atendimento', label: 'Em Atendimento', color: 'bg-blue-500' },
+    { id: 'novo', label: 'Novo Lead', color: 'bg-gray-500' },
     { id: 'negociando', label: 'Negociando', color: 'bg-yellow-500' },
     { id: 'aprovado', label: 'Aprovado', color: 'bg-purple-500' },
     { id: 'fechado', label: 'Fechado', color: 'bg-green-500' },
@@ -220,7 +225,13 @@ function KanbanColumn({
         id: column.id,
     });
 
-    const columnLeads = leads.filter(l => (l.status || 'novo') === column.id);
+    const columnLeads = leads.filter(l => {
+        const rawStatus = l.status?.trim() || 'novo';
+        // Mapear status legados ou desconhecidos para 'novo'
+        const validStatuses = KANBAN_COLUMNS.map(c => c.id);
+        const status = validStatuses.includes(rawStatus) ? rawStatus : 'novo';
+        return status === column.id;
+    });
 
     return (
         <div className="flex flex-col w-80 h-full">
@@ -533,6 +544,58 @@ function LeadModal({
                                     </div>
                                 )}
                             </div>
+                            <div className="col-span-1 md:col-span-2 border-t border-gray-100 pt-4 mt-2">
+                                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Documentação e Filiação</h3>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">CPF</label>
+                                <input
+                                    type="text"
+                                    value={formData.cpf || ''}
+                                    onChange={(e) => setFormData({ ...formData, cpf: e.target.value })}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none font-mono"
+                                    placeholder="000.000.000-00"
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">RG</label>
+                                    <input
+                                        type="text"
+                                        value={formData.rg || ''}
+                                        onChange={(e) => setFormData({ ...formData, rg: e.target.value })}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Órgão Emissor</label>
+                                    <input
+                                        type="text"
+                                        value={formData.rg_orgao || ''}
+                                        onChange={(e) => setFormData({ ...formData, rg_orgao: e.target.value })}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                                        placeholder="Ex: SSP/GO"
+                                    />
+                                </div>
+                            </div>
+                            <div className="col-span-1 md:col-span-2">
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Nome do Pai</label>
+                                <input
+                                    type="text"
+                                    value={formData.nome_pai || ''}
+                                    onChange={(e) => setFormData({ ...formData, nome_pai: e.target.value })}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                                />
+                            </div>
+                            <div className="col-span-1 md:col-span-2">
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Nome da Mãe</label>
+                                <input
+                                    type="text"
+                                    value={formData.nome_mae || ''}
+                                    onChange={(e) => setFormData({ ...formData, nome_mae: e.target.value })}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                                />
+                            </div>
                         </div>
                     )}
 
@@ -775,6 +838,14 @@ export default function LeadsPage() {
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [editingLead, setEditingLead] = useState<Lead | null>(null)
 
+    // Estados de Filtro
+    const [searchQuery, setSearchQuery] = useState('')
+    const [filterProfession, setFilterProfession] = useState('')
+    const [filterBank, setFilterBank] = useState('')
+    const [filterMinMargin, setFilterMinMargin] = useState<number | ''>('')
+    const [filterFollowUp, setFilterFollowUp] = useState(false)
+    const [showFilters, setShowFilters] = useState(false)
+
     const sensors = useSensors(
         useSensor(PointerSensor, {
             activationConstraint: {
@@ -801,6 +872,34 @@ export default function LeadsPage() {
         }
         setLoading(false)
     }
+
+    // Lógica de Filtragem
+    const filteredLeads = leads.filter(lead => {
+        const query = searchQuery.toLowerCase().trim()
+        const digitsOnly = query.replace(/\D/g, '')
+
+        const matchesSearch = !query ||
+            lead.name?.toLowerCase().includes(query) ||
+            (digitsOnly && lead.phone.replace(/\D/g, '').includes(digitsOnly)) ||
+            (digitsOnly && lead.cpf?.replace(/\D/g, '').includes(digitsOnly))
+
+        const matchesProfession = !filterProfession ||
+            lead.profissao?.toLowerCase() === filterProfession.toLowerCase()
+
+        const matchesBank = !filterBank ||
+            lead.ultimo_emprestimo_banco?.toLowerCase() === filterBank.toLowerCase()
+
+        const matchesMargin = filterMinMargin === '' ||
+            (lead.last_margin || 0) >= filterMinMargin
+
+        const matchesFollowUp = !filterFollowUp || lead.needs_followup
+
+        return matchesSearch && matchesProfession && matchesBank && matchesMargin && matchesFollowUp
+    })
+
+    // Extrair opções únicas para os selects de filtro
+    const professions = Array.from(new Set(leads.map(l => l.profissao).filter(Boolean))) as string[]
+    const banks = Array.from(new Set(leads.map(l => l.ultimo_emprestimo_banco).filter(Boolean))) as string[]
 
     const handleSaveLead = async (leadData: Partial<Lead>) => {
         if (leadData.id) {
@@ -853,8 +952,8 @@ export default function LeadsPage() {
 
         if (activeId === overId) return
 
-        const activeLead = leads.find(l => l.id === activeId)
-        const overLead = leads.find(l => l.id === overId)
+        const activeLead = filteredLeads.find(l => l.id === activeId)
+        const overLead = filteredLeads.find(l => l.id === overId)
 
         // Se arrastei sobre uma coluna (container)
         const isOverAColumn = KANBAN_COLUMNS.find(col => col.id === overId)
@@ -878,7 +977,7 @@ export default function LeadsPage() {
 
         if (!over) return
 
-        const activeLead = leads.find(l => l.id === active.id)
+        const activeLead = filteredLeads.find(l => l.id === active.id)
         if (!activeLead) return
 
         const overId = over.id
@@ -905,29 +1004,111 @@ export default function LeadsPage() {
     return (
         <div className="flex flex-col h-[calc(100vh-64px)] -m-8 p-8 overflow-hidden w-[calc(100%+64px)]">
             {/* Header Fixo */}
-            <div className="z-10 bg-gray-50/80 backdrop-blur-md pb-6 shrink-0 mr-8">
-                <div className="flex items-center justify-between">
+            <div className="z-20 bg-gray-50/80 backdrop-blur-md pb-4 shrink-0 mr-8">
+                <div className="flex items-center justify-between mb-4">
                     <div>
                         <h1 className="text-2xl font-bold text-foreground">Gestão de Leads</h1>
-                        <div className="flex items-center gap-2 mt-1">
-                            <span className="text-sm text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
-                                {leads.length} leads ativos
-                            </span>
-                            <span className="text-sm font-semibold text-green-600 bg-green-50 px-2 py-0.5 rounded">
-                                R$ {leads.reduce((sum, l) => sum + (l.last_margin || 0), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} em margem
-                            </span>
-                        </div>
                     </div>
-                    <button
-                        onClick={() => {
-                            setEditingLead(null)
-                            setIsModalOpen(true)
-                        }}
-                        className="flex items-center gap-2 px-6 py-3 bg-accent text-white rounded-xl hover:bg-accent-dark transition-all shadow-md hover:shadow-lg active:scale-95 font-semibold"
-                    >
-                        <Plus size={20} />
-                        Cadastrar Lead
-                    </button>
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={() => setShowFilters(!showFilters)}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all font-medium border
+                                ${showFilters || filterProfession || filterBank || filterMinMargin !== '' || filterFollowUp
+                                    ? 'bg-primary/10 border-primary text-primary'
+                                    : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'}`}
+                        >
+                            <Filter size={18} />
+                            Filtros
+                            {(filterProfession || filterBank || filterMinMargin !== '' || filterFollowUp) && (
+                                <span className="w-2 h-2 bg-primary rounded-full" />
+                            )}
+                        </button>
+                        <button
+                            onClick={() => {
+                                setEditingLead(null)
+                                setIsModalOpen(true)
+                            }}
+                            className="flex items-center gap-2 px-6 py-2 bg-accent text-white rounded-xl hover:bg-accent-dark transition-all shadow-md hover:shadow-lg active:scale-95 font-semibold"
+                        >
+                            <Plus size={20} />
+                            Cadastrar Lead
+                        </button>
+                    </div>
+                </div>
+
+                {/* Barra de Busca e Filtros Rápidos */}
+                <div className="flex flex-col gap-4">
+                    <div className="relative">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                        <input
+                            type="text"
+                            placeholder="Buscar por nome, telefone ou CPF..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full pl-12 pr-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all shadow-sm"
+                        />
+                        {searchQuery && (
+                            <button
+                                onClick={() => setSearchQuery('')}
+                                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                            >
+                                <XCircle size={18} />
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Painel de Filtros Avançados */}
+                    {showFilters && (
+                        <div className="p-4 bg-white border border-gray-200 rounded-xl shadow-sm grid grid-cols-1 md:grid-cols-4 gap-4 animate-in fade-in slide-in-from-top-2 duration-200">
+                            <div>
+                                <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1 ml-1">Profissão</label>
+                                <select
+                                    value={filterProfession}
+                                    onChange={(e) => setFilterProfession(e.target.value)}
+                                    className="w-full px-3 py-2 bg-gray-50 border border-gray-100 rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary"
+                                >
+                                    <option value="">Todas</option>
+                                    {professions.map(p => (
+                                        <option key={p} value={p}>{p}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1 ml-1">Banco Origem</label>
+                                <select
+                                    value={filterBank}
+                                    onChange={(e) => setFilterBank(e.target.value)}
+                                    className="w-full px-3 py-2 bg-gray-50 border border-gray-100 rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary"
+                                >
+                                    <option value="">Todos</option>
+                                    {banks.map(b => (
+                                        <option key={b} value={b}>{b}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1 ml-1">Margem Mínima</label>
+                                <input
+                                    type="number"
+                                    placeholder="R$ 0,00"
+                                    value={filterMinMargin}
+                                    onChange={(e) => setFilterMinMargin(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                                    className="w-full px-3 py-2 bg-gray-50 border border-gray-100 rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary"
+                                />
+                            </div>
+                            <div className="flex items-end pb-1.5">
+                                <label className="flex items-center gap-2 cursor-pointer select-none">
+                                    <input
+                                        type="checkbox"
+                                        checked={filterFollowUp}
+                                        onChange={(e) => setFilterFollowUp(e.target.checked)}
+                                        className="w-4 h-4 text-primary rounded border-gray-300 focus:ring-primary"
+                                    />
+                                    <span className="text-sm font-medium text-gray-600">Apenas Follow-up</span>
+                                </label>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -944,7 +1125,7 @@ export default function LeadsPage() {
                             <KanbanColumn
                                 key={column.id}
                                 column={column}
-                                leads={leads}
+                                leads={filteredLeads}
                                 loading={loading}
                                 onEdit={(l) => {
                                     setEditingLead(l)
@@ -960,9 +1141,9 @@ export default function LeadsPage() {
                     {activeId ? (
                         <div className="bg-white rounded-lg shadow-2xl p-4 border-l-4 border-l-primary scale-105 rotate-2 opacity-95">
                             <h4 className="font-bold text-gray-900 text-sm">
-                                {leads.find(l => l.id === activeId)?.name || 'Lead Selecionado'}
+                                {filteredLeads.find(l => l.id === activeId)?.name || 'Lead Selecionado'}
                             </h4>
-                            <p className="text-xs text-gray-500 mt-1">{leads.find(l => l.id === activeId)?.phone}</p>
+                            <p className="text-xs text-gray-500 mt-1">{filteredLeads.find(l => l.id === activeId)?.phone}</p>
                         </div>
                     ) : null}
                 </DragOverlay>
