@@ -234,7 +234,7 @@ function KanbanColumn({
     });
 
     return (
-        <div className="flex flex-col w-80 h-full">
+        <div className="flex flex-col w-72 md:w-80 h-full">
             <div className={`${column.color} text-white px-5 py-3 rounded-t-xl shadow-sm shrink-0`}>
                 <div className="flex items-center justify-between">
                     <span className="font-bold tracking-wide uppercase text-xs">{column.label}</span>
@@ -385,10 +385,10 @@ function LeadModal({
     ]
 
     return (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl w-full max-w-2xl shadow-xl max-h-[90vh] flex flex-col">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-0 md:p-4">
+            <div className="bg-white w-full h-full md:h-auto md:rounded-xl md:max-w-2xl shadow-xl md:max-h-[90vh] flex flex-col">
                 {/* Header */}
-                <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50 rounded-t-xl">
+                <div className="p-4 md:p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50 md:rounded-t-xl">
                     <div>
                         <h2 className="text-xl font-bold text-primary">
                             {lead ? 'Editar Lead' : 'Novo Lead'}
@@ -403,7 +403,7 @@ function LeadModal({
                 </div>
 
                 {/* Tabs Navigation */}
-                <div className="flex border-b border-gray-100 px-6 bg-white overflow-x-auto">
+                <div className="flex border-b border-gray-100 px-3 md:px-6 bg-white overflow-x-auto">
                     {tabs.map((tab) => (
                         <button
                             key={tab.id}
@@ -420,7 +420,7 @@ function LeadModal({
                 </div>
 
                 {/* Form Body */}
-                <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6">
+                <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
                     {activeTab === 'essencial' && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="col-span-1 md:col-span-2">
@@ -811,7 +811,7 @@ function LeadModal({
                 </form>
 
                 {/* Action Buttons */}
-                <div className="p-6 border-t border-gray-100 bg-gray-50/50 flex gap-3 rounded-b-xl">
+                <div className="p-4 md:p-6 border-t border-gray-100 bg-gray-50/50 flex gap-3 md:rounded-b-xl">
                     <button
                         type="button"
                         onClick={onClose}
@@ -1002,23 +1002,23 @@ export default function LeadsPage() {
     }
 
     return (
-        <div className="flex flex-col h-[calc(100vh-64px)] -m-8 p-8 overflow-hidden w-[calc(100%+64px)]">
+        <div className="flex flex-col h-[calc(100vh-64px)] -m-4 p-4 md:-m-8 md:p-8 overflow-hidden w-[calc(100%+32px)] md:w-[calc(100%+64px)]">
             {/* Header Fixo */}
-            <div className="z-20 bg-gray-50/80 backdrop-blur-md pb-4 shrink-0 mr-8">
-                <div className="flex items-center justify-between mb-4">
+            <div className="z-20 bg-gray-50/80 backdrop-blur-md pb-4 shrink-0 mr-0 md:mr-8">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-4">
                     <div>
-                        <h1 className="text-2xl font-bold text-foreground">Gestão de Leads</h1>
+                        <h1 className="text-xl md:text-2xl font-bold text-foreground">Gestão de Leads</h1>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 md:gap-3">
                         <button
                             onClick={() => setShowFilters(!showFilters)}
-                            className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all font-medium border
+                            className={`flex items-center gap-2 px-3 md:px-4 py-2 rounded-xl transition-all font-medium border text-sm md:text-base
                                 ${showFilters || filterProfession || filterBank || filterMinMargin !== '' || filterFollowUp
                                     ? 'bg-primary/10 border-primary text-primary'
                                     : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'}`}
                         >
                             <Filter size={18} />
-                            Filtros
+                            <span className="hidden sm:inline">Filtros</span>
                             {(filterProfession || filterBank || filterMinMargin !== '' || filterFollowUp) && (
                                 <span className="w-2 h-2 bg-primary rounded-full" />
                             )}
@@ -1028,10 +1028,11 @@ export default function LeadsPage() {
                                 setEditingLead(null)
                                 setIsModalOpen(true)
                             }}
-                            className="flex items-center gap-2 px-6 py-2 bg-accent text-white rounded-xl hover:bg-accent-dark transition-all shadow-md hover:shadow-lg active:scale-95 font-semibold"
+                            className="flex items-center gap-2 px-4 md:px-6 py-2 bg-accent text-white rounded-xl hover:bg-accent-dark transition-all shadow-md hover:shadow-lg active:scale-95 font-semibold text-sm md:text-base"
                         >
                             <Plus size={20} />
-                            Cadastrar Lead
+                            <span className="hidden sm:inline">Cadastrar Lead</span>
+                            <span className="sm:hidden">Novo</span>
                         </button>
                     </div>
                 </div>
@@ -1059,7 +1060,7 @@ export default function LeadsPage() {
 
                     {/* Painel de Filtros Avançados */}
                     {showFilters && (
-                        <div className="p-4 bg-white border border-gray-200 rounded-xl shadow-sm grid grid-cols-1 md:grid-cols-4 gap-4 animate-in fade-in slide-in-from-top-2 duration-200">
+                        <div className="p-4 bg-white border border-gray-200 rounded-xl shadow-sm grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 animate-in fade-in slide-in-from-top-2 duration-200">
                             <div>
                                 <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1 ml-1">Profissão</label>
                                 <select
