@@ -3,12 +3,13 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Users, LogOut, Menu, X } from 'lucide-react'
+import { Users, LogOut, Menu, X, Megaphone } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 
 const menuItems = [
     { href: '/dashboard', icon: Users, label: 'Leads' },
+    { href: '/dashboard/campanhas', icon: Megaphone, label: 'Campanhas' },
 ]
 
 export function Sidebar() {
