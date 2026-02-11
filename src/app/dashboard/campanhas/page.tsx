@@ -25,6 +25,8 @@ interface SendResult {
     name: string
     success: boolean
     error?: string
+    text?: string
+    timestamp?: string
 }
 
 type CampaignStatus = 'idle' | 'sending' | 'done'
@@ -48,6 +50,10 @@ export default function CampanhasPage() {
     const [campaignStatus, setCampaignStatus] = useState<CampaignStatus>('idle')
     const [results, setResults] = useState<SendResult[]>([])
     const [showResults, setShowResults] = useState(false)
+    const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false)
+    const [resultSearchQuery, setResultSearchQuery] = useState('')
+    const [selectedResult, setSelectedResult] = useState<SendResult | null>(null)
+    const [completionDate, setCompletionDate] = useState<string | null>(null)
 
     useEffect(() => {
         loadLeads()
@@ -138,13 +144,18 @@ export default function CampanhasPage() {
     const selectedLeads = filteredLeads.filter(l => selectedIds.has(l.id))
 
     const handleSend = async () => {
+        console.log('handleSend clicked', { messageLen: message.length, selectedLeadsLen: selectedLeads.length })
         if (!message.trim() || selectedLeads.length === 0) return
+        setIsConfirmModalOpen(true)
+    }
 
-        if (!confirm(`Confirma o disparo de ${selectedLeads.length} mensagen(s)?`)) return
-
+    const processSend = async () => {
+        console.log('processSend started')
+        setIsConfirmModalOpen(false)
         setCampaignStatus('sending')
         setResults([])
         setShowResults(true)
+        setCompletionDate(null)
 
         try {
             const response = await fetch('/api/campaign/send', {
@@ -160,9 +171,17 @@ export default function CampanhasPage() {
             })
 
             const data = await response.json()
+            console.log('Response received', data)
 
             if (data.results) {
-                setResults(data.results)
+                // Adicionar o texto e timestamp aos resultados
+                const enrichedResults = data.results.map((r: any) => ({
+                    ...r,
+                    text: message.replace(/\{nome\}/gi, r.name || 'Cliente'),
+                    timestamp: new Date().toLocaleTimeString('pt-BR')
+                }))
+                setResults(enrichedResults)
+                setCompletionDate(new Date().toLocaleDateString('pt-BR'))
             }
         } catch (err) {
             console.error('Erro no disparo:', err)
@@ -174,7 +193,7 @@ export default function CampanhasPage() {
     const statusOptions = [
         { id: 'novo', label: 'Novo Lead', color: 'bg-gray-100 text-gray-700' },
         { id: 'negociando', label: 'Negociando', color: 'bg-yellow-100 text-yellow-700' },
-        { id: 'aprovado', label: 'Aprovado', color: 'bg-purple-100 text-purple-700' },
+        { id: 'finalizado', label: 'Finalizado', color: 'bg-green-100 text-green-700' },
     ]
 
     return (
@@ -207,14 +226,6 @@ export default function CampanhasPage() {
                     className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all resize-none text-sm"
                     rows={4}
                 />
-                {message && (
-                    <div className="bg-green-50 border border-green-100 rounded-lg p-3">
-                        <p className="text-[10px] font-bold text-green-600 uppercase tracking-wider mb-1">Preview</p>
-                        <p className="text-sm text-green-800">
-                            {message.replace(/\{nome\}/gi, 'João da Silva')}
-                        </p>
-                    </div>
-                )}
             </div>
 
             {/* Filtros de Segmentação */}
@@ -270,6 +281,7 @@ export default function CampanhasPage() {
                                     value={filterMinValue}
                                     onChange={(e) => setFilterMinValue(e.target.value === '' ? '' : parseFloat(e.target.value))}
                                     className="w-full px-3 py-2 bg-gray-50 border border-gray-100 rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary"
+                                    suppressHydrationWarning
                                 />
                             </div>
                         </div>
@@ -337,6 +349,7 @@ export default function CampanhasPage() {
                                     checked={selectedIds.has(lead.id)}
                                     onChange={() => toggleSelect(lead.id)}
                                     className="w-4 h-4 text-primary rounded border-gray-300 focus:ring-primary shrink-0"
+                                    suppressHydrationWarning
                                 />
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2">
@@ -373,10 +386,11 @@ export default function CampanhasPage() {
                 <div className="flex items-center gap-2 text-sm text-gray-500">
                     <Info size={16} />
                     <span>
-                        {selectedLeads.length} lead(s) selecionado(s) • Delay de 3s entre disparos
+                        {selectedLeads.length} lead(s) selecionado(s) • Delay de 15s entre disparos
                     </span>
                 </div>
                 <button
+                    type="button"
                     onClick={handleSend}
                     disabled={campaignStatus === 'sending' || !message.trim() || selectedLeads.length === 0}
                     className="flex items-center justify-center gap-2 px-8 py-3 bg-accent text-white rounded-xl hover:bg-accent-dark transition-all shadow-md hover:shadow-lg active:scale-95 font-bold disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100"
@@ -397,44 +411,230 @@ export default function CampanhasPage() {
 
             {/* Relatório de Resultados */}
             {showResults && results.length > 0 && (
-                <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-                    <div className="px-4 md:px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-                        <span className="text-sm font-bold text-gray-700 uppercase tracking-wider">
-                            Relatório de Envio
-                        </span>
-                        <div className="flex items-center gap-3">
-                            <span className="flex items-center gap-1 text-xs font-bold text-green-600">
-                                <CheckCircle size={14} />
-                                {results.filter(r => r.success).length} enviados
-                            </span>
-                            {results.filter(r => !r.success).length > 0 && (
-                                <span className="flex items-center gap-1 text-xs font-bold text-red-600">
-                                    <XCircle size={14} />
-                                    {results.filter(r => !r.success).length} falhas
+                <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden animate-in fade-in slide-in-from-top-4 duration-500">
+                    <div className="px-4 md:px-6 py-4 border-b border-gray-100 bg-gray-50/50">
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="flex flex-col">
+                                <span className="text-sm font-bold text-gray-700 uppercase tracking-wider flex items-center gap-2">
+                                    Relatório de Envio
+                                    {completionDate && (
+                                        <span className="text-[10px] font-medium bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full lowercase">
+                                            {completionDate}
+                                        </span>
+                                    )}
                                 </span>
-                            )}
-                        </div>
-                    </div>
-                    <div className="max-h-60 overflow-y-auto divide-y divide-gray-50">
-                        {results.map((result, i) => (
-                            <div key={i} className="flex items-center gap-3 px-4 md:px-6 py-3">
-                                {result.success ? (
-                                    <CheckCircle className="text-green-500 shrink-0" size={16} />
-                                ) : (
-                                    <XCircle className="text-red-500 shrink-0" size={16} />
-                                )}
-                                <div className="flex-1 min-w-0">
-                                    <span className="text-sm font-medium text-gray-900">{result.name}</span>
-                                    <span className="text-xs text-gray-400 ml-2">{result.phone}</span>
-                                </div>
-                                {!result.success && result.error && (
-                                    <span className="text-[10px] text-red-500 truncate max-w-[120px]">{result.error}</span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <span className="flex items-center gap-1 text-xs font-bold text-green-600">
+                                    <CheckCircle size={14} />
+                                    {results.filter(r => r.success).length}
+                                </span>
+                                {results.filter(r => !r.success).length > 0 && (
+                                    <span className="flex items-center gap-1 text-xs font-bold text-red-600">
+                                        <XCircle size={14} />
+                                        {results.filter(r => !r.success).length}
+                                    </span>
                                 )}
                             </div>
-                        ))}
+                        </div>
+
+                        {/* Busca nos Resultados */}
+                        <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                            <input
+                                type="text"
+                                placeholder="Pesquisar por nome ou celular no relatório..."
+                                value={resultSearchQuery}
+                                onChange={(e) => setResultSearchQuery(e.target.value)}
+                                className="w-full pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-xs outline-none focus:ring-1 focus:ring-primary transition-all"
+                                suppressHydrationWarning
+                            />
+                        </div>
+                    </div>
+
+                    <div className="max-h-80 overflow-y-auto divide-y divide-gray-50">
+                        {results
+                            .filter(r =>
+                                !resultSearchQuery ||
+                                r.name.toLowerCase().includes(resultSearchQuery.toLowerCase()) ||
+                                r.phone.includes(resultSearchQuery)
+                            )
+                            .map((result, i) => (
+                                <button
+                                    key={i}
+                                    type="button"
+                                    onClick={() => setSelectedResult(result)}
+                                    className="w-full flex items-center gap-3 px-4 md:px-6 py-3 hover:bg-gray-50 transition-colors text-left group cursor-pointer"
+                                >
+                                    {result.success ? (
+                                        <CheckCircle className="text-green-500 shrink-0" size={16} />
+                                    ) : (
+                                        <XCircle className="text-red-500 shrink-0" size={16} />
+                                    )}
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-sm font-medium text-gray-900">{result.name}</span>
+                                            {result.timestamp && (
+                                                <span className="text-[10px] text-gray-400 font-mono">
+                                                    {result.timestamp}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <span className="text-xs text-gray-400">{result.phone}</span>
+                                    </div>
+                                    {!result.success && result.error && (
+                                        <span className="text-[10px] text-red-500 truncate max-w-[120px]">{result.error}</span>
+                                    )}
+                                    <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <Info size={14} className="text-gray-300" />
+                                    </div>
+                                </button>
+                            ))}
                     </div>
                 </div>
             )}
+
+            {/* Modal de Detalhes do Resultado */}
+            <ResultDetailModal
+                result={selectedResult}
+                onClose={() => setSelectedResult(null)}
+            />
+            {/* Modal de Confirmação Customizado */}
+            <ConfirmModal
+                isOpen={isConfirmModalOpen}
+                onClose={() => {
+                    console.log('ConfirmModal: onClose triggered')
+                    setIsConfirmModalOpen(false)
+                }}
+                onConfirm={processSend}
+                count={selectedLeads.length}
+            />
+        </div>
+    )
+}
+
+function ResultDetailModal({ result, onClose }: { result: SendResult | null, onClose: () => void }) {
+    if (!result) return null
+
+    return (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onClick={onClose} />
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden relative z-10 border border-gray-100">
+                <div className="p-6 md:p-8 space-y-6">
+                    <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+                        <div className="flex items-center gap-3">
+                            <div className={`p-2 rounded-lg ${result.success ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
+                                {result.success ? <CheckCircle size={20} /> : <XCircle size={20} />}
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-gray-900">{result.name}</h3>
+                                <p className="text-xs text-gray-500">{result.phone}</p>
+                            </div>
+                        </div>
+                        <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
+                            <XCircle size={24} />
+                        </button>
+                    </div>
+
+                    <div className="space-y-4">
+                        <div>
+                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-2">Mensagem Enviada</label>
+                            <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
+                                <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed italic">
+                                    "{result.text || 'Nenhuma mensagem registrada'}"
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">Horário Envio</label>
+                                <span className="text-sm text-gray-600 font-mono">{result.timestamp || '--:--'}</span>
+                            </div>
+                            <div>
+                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">Status</label>
+                                <span className={`text-sm font-bold ${result.success ? 'text-green-600' : 'text-red-600'}`}>
+                                    {result.success ? 'Sucesso' : 'Falha'}
+                                </span>
+                            </div>
+                        </div>
+
+                        {!result.success && result.error && (
+                            <div className="bg-red-50 border border-red-100 rounded-lg p-3">
+                                <label className="text-[10px] font-bold text-red-400 uppercase tracking-widest block mb-1">Erro</label>
+                                <p className="text-xs text-red-700">{result.error}</p>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="pt-4">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="w-full py-3 bg-gray-900 text-white rounded-xl text-sm font-bold hover:bg-black transition-all active:scale-95"
+                        >
+                            Fechar Detalhes
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+function ConfirmModal({ isOpen, onClose, onConfirm, count }: { isOpen: boolean, onClose: () => void, onConfirm: () => void, count: number }) {
+    if (!isOpen) return null
+
+    return (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+            {/* Backdrop */}
+            <div
+                className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                onClick={onClose}
+            />
+
+            {/* Modal Content */}
+            <div
+                className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden relative z-10 border border-gray-100"
+                onClick={(e) => e.stopPropagation()}
+            >
+                <div className="p-6 md:p-8 space-y-6 text-center">
+                    <div className="mx-auto w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center text-orange-600 mb-4">
+                        <Megaphone size={32} />
+                    </div>
+
+                    <div className="space-y-2">
+                        <h3 className="text-xl font-bold text-gray-900">Confirmar Disparo</h3>
+                        <p className="text-sm text-gray-500 leading-relaxed">
+                            Você está prestes a enviar uma campanha para <span className="font-bold text-gray-900">{count} lead(s)</span>.
+                            Deseja continuar?
+                        </p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 pt-2">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="px-4 py-3 border border-gray-200 rounded-xl text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors"
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                console.log('ConfirmModal: onConfirm action fired')
+                                onConfirm()
+                            }}
+                            className="px-4 py-3 bg-orange-600 text-white rounded-xl text-sm font-bold hover:bg-orange-700 transition-all shadow-md active:scale-95"
+                        >
+                            Confirmar
+                        </button>
+                    </div>
+                </div>
+
+                {/* Linha Decorativa Inferior */}
+                <div className="h-1.5 bg-gradient-to-r from-orange-500 to-orange-700 w-full" />
+            </div>
         </div>
     )
 }

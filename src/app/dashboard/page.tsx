@@ -81,8 +81,7 @@ interface Contract {
 const KANBAN_COLUMNS = [
     { id: 'novo', label: 'Novo Lead', color: 'bg-gray-500' },
     { id: 'negociando', label: 'Negociando', color: 'bg-yellow-500' },
-    { id: 'aprovado', label: 'Aprovado', color: 'bg-purple-500' },
-    { id: 'fechado', label: 'Fechado', color: 'bg-green-500' },
+    { id: 'finalizado', label: 'Finalizado', color: 'bg-green-500' },
     { id: 'perdido', label: 'Perdido', color: 'bg-red-500' },
 ]
 
@@ -226,8 +225,13 @@ function KanbanColumn({
     });
 
     const columnLeads = leads.filter(l => {
-        const rawStatus = l.status?.trim() || 'novo';
-        // Mapear status legados ou desconhecidos para 'novo'
+        let rawStatus = l.status?.trim() || 'novo';
+
+        // Mapear status legados para os novos
+        if (rawStatus === 'aprovado' || rawStatus === 'fechado') {
+            rawStatus = 'finalizado';
+        }
+
         const validStatuses = KANBAN_COLUMNS.map(c => c.id);
         const status = validStatuses.includes(rawStatus) ? rawStatus : 'novo';
         return status === column.id;
@@ -431,6 +435,7 @@ function LeadModal({
                                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
                                     placeholder="Ex: João da Silva"
+                                    suppressHydrationWarning
                                 />
                             </div>
                             <div>
@@ -441,6 +446,7 @@ function LeadModal({
                                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
                                     required
+                                    suppressHydrationWarning
                                 />
                             </div>
                             <div>
@@ -463,6 +469,7 @@ function LeadModal({
                                     onChange={(e) => setFormData({ ...formData, last_margin: parseFloat(e.target.value) || 0 })}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
                                     step="0.01"
+                                    suppressHydrationWarning
                                 />
                             </div>
                             <div>
@@ -486,6 +493,7 @@ function LeadModal({
                                     value={formData.data_nascimento || ''}
                                     onChange={(e) => setFormData({ ...formData, data_nascimento: e.target.value })}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                                    suppressHydrationWarning
                                 />
                             </div>
                             <div>
@@ -519,6 +527,7 @@ function LeadModal({
                                     onChange={(e) => setFormData({ ...formData, renda_mensal: parseFloat(e.target.value) || 0 })}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
                                     step="0.01"
+                                    suppressHydrationWarning
                                 />
                             </div>
                             <div className="flex items-center gap-4 mt-2">
@@ -1047,6 +1056,7 @@ export default function LeadsPage() {
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             className="w-full pl-12 pr-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all shadow-sm"
+                            suppressHydrationWarning
                         />
                         {searchQuery && (
                             <button

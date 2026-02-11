@@ -109,6 +109,27 @@ Centro de comando para correspondente bancário, focado em gestão de leads e co
 
 ---
 
-**Última Atualização:** 2026-02-10 às 20:20
-**Atualizado por:** J.A.R.V.I.S. (automated)
+### Sessão 2026-02-11 - Noite
+**Trabalho Realizado:**
+- ✅ **Campanhas WhatsApp (V2)**:
+  - Aumento do delay entre disparos para **15 segundos** (maior segurança).
+  - Relatório de envio aprimorado com **data do disparo**.
+  - Sistema de **busca e filtro** direto no relatório de resultados.
+  - **Modal de Detalhes**: visualização da mensagem personalizada e horário exato de cada envio.
+  - Melhorias de UX: cursor pointer em itens clicáveis e remoção de preview redundante.
+- ✅ **Simplificação de Workflow**:
+  - Unificação do Kanban de 5 para **4 colunas principais**: Novo Lead, Negociando, Finalizado, Perdido.
+  - Mapeamento automático de status legados ('aprovado', 'fechado') para '**Finalizado**'.
+  - Sincronização global de opções de status (Modais e Filtros).
+- ✅ **Estabilidade**:
+  - Fix de erro de hidratação em inputs causado por extensões de navegador (`suppressHydrationWarning`).
+
+**Próximos Passos:**
+- Monitorar a taxa de entrega dos disparos com o novo delay.
+- Expandir as métricas de conversão no relatório finalizado.
+
+---
+
+**Última Atualização:** 2026-02-11 às 18:58
+**Atualizado por:** Antigravity (automated)
 

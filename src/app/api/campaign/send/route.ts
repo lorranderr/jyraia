@@ -4,7 +4,7 @@ const EVOLUTION_API_URL = process.env.EVOLUTION_API_URL!
 const EVOLUTION_API_TOKEN = process.env.EVOLUTION_API_TOKEN!
 const EVOLUTION_INSTANCE = process.env.EVOLUTION_INSTANCE!
 
-const DELAY_MS = 3000 // 3 segundos entre cada disparo
+const DELAY_MS = 15000 // 15 segundos entre cada disparo
 
 interface SendRequest {
     numbers: { phone: string; name: string }[]
