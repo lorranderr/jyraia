@@ -155,9 +155,9 @@ function SortableLeadCard({
             </div>
 
             {/* Margem */}
-            {lead.last_margin && lead.last_margin > 0 && (
+            {typeof lead.last_margin === 'number' && (
                 <div className="mt-2 text-sm font-semibold text-green-600">
-                    R$ {lead.last_margin.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    Margem: R$ {lead.last_margin.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </div>
             )}
 
