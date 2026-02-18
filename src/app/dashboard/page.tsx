@@ -519,12 +519,13 @@ function LeadModal({
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Profissão</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Convênio (Consignadora)</label>
                                 <input
                                     type="text"
                                     value={formData.profissao || ''}
                                     onChange={(e) => setFormData({ ...formData, profissao: e.target.value })}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                                    placeholder="Ex: INSS, SIAPE, Governo, Forças Armadas"
                                 />
                             </div>
                             <div>
@@ -617,64 +618,73 @@ function LeadModal({
                     )}
 
                     {activeTab === 'endereco' && (
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">CEP</label>
-                                <input
-                                    type="text"
-                                    value={formData.cep || ''}
-                                    onChange={(e) => setFormData({ ...formData, cep: e.target.value })}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
-                                    placeholder="00000-000"
-                                />
+                        <>
+                            <div className="space-y-4">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">CEP</label>
+                                        <input
+                                            type="text"
+                                            value={formData.cep || ''}
+                                            onChange={(e) => setFormData({ ...formData, cep: e.target.value })}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                                            placeholder="00000-000"
+                                        />
+                                    </div>
+                                    <div className="md:col-span-2">
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Logradouro</label>
+                                        <input
+                                            type="text"
+                                            value={formData.logradouro || ''}
+                                            onChange={(e) => setFormData({ ...formData, logradouro: e.target.value })}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Número</label>
+                                        <input
+                                            type="text"
+                                            value={formData.numero || ''}
+                                            onChange={(e) => setFormData({ ...formData, numero: e.target.value })}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                                        />
+                                    </div>
+                                    <div className="md:col-span-2">
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Bairro</label>
+                                        <input
+                                            type="text"
+                                            value={formData.bairro || ''}
+                                            onChange={(e) => setFormData({ ...formData, bairro: e.target.value })}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                                        />
+                                    </div>
+                                </div>
                             </div>
-                            <div className="md:col-span-2">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Logradouro</label>
-                                <input
-                                    type="text"
-                                    value={formData.logradouro || ''}
-                                    onChange={(e) => setFormData({ ...formData, logradouro: e.target.value })}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
-                                />
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-gray-100 pt-4">
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-800 mb-1">Cidade</label>
+                                    <input
+                                        type="text"
+                                        value={formData.cidade || ''}
+                                        onChange={(e) => setFormData({ ...formData, cidade: e.target.value })}
+                                        className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none bg-gray-50/50"
+                                        placeholder="Nome da Cidade"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-800 mb-1">Estado</label>
+                                    <input
+                                        type="text"
+                                        value={formData.estado || ''}
+                                        onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
+                                        className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none bg-gray-50/50"
+                                        maxLength={2}
+                                        placeholder="UF"
+                                    />
+                                </div>
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Número</label>
-                                <input
-                                    type="text"
-                                    value={formData.numero || ''}
-                                    onChange={(e) => setFormData({ ...formData, numero: e.target.value })}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
-                                />
-                            </div>
-                            <div className="md:col-span-2">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Bairro</label>
-                                <input
-                                    type="text"
-                                    value={formData.bairro || ''}
-                                    onChange={(e) => setFormData({ ...formData, bairro: e.target.value })}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
-                                />
-                            </div>
-                            <div className="md:col-span-2">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Cidade</label>
-                                <input
-                                    type="text"
-                                    value={formData.cidade || ''}
-                                    onChange={(e) => setFormData({ ...formData, cidade: e.target.value })}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
-                                <input
-                                    type="text"
-                                    value={formData.estado || ''}
-                                    onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
-                                    maxLength={2}
-                                />
-                            </div>
-                        </div>
+                        </>
                     )}
 
                     {activeTab === 'bancario' && (
@@ -843,8 +853,8 @@ function LeadModal({
                         Salvar Alterações
                     </button>
                 </div>
-            </div>
-        </div>
+            </div >
+        </div >
     )
 }
 
