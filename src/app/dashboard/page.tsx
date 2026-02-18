@@ -114,7 +114,8 @@ function SortableLeadCard({
         <div
             ref={setNodeRef}
             style={style}
-            className="bg-white rounded-lg shadow-sm p-4 hover:shadow-md transition-shadow group border-l-4 border-l-primary cursor-grab active:cursor-grabbing"
+            className={`bg-white rounded-lg shadow-sm p-4 hover:shadow-md transition-shadow group border-l-4 ${(lead.last_margin || 0) > 5000 ? 'border-l-amber-500' : 'border-l-primary'
+                } cursor-grab active:cursor-grabbing`}
             {...attributes}
             {...listeners}
         >
@@ -156,8 +157,15 @@ function SortableLeadCard({
 
             {/* Margem */}
             {typeof lead.last_margin === 'number' && (
-                <div className="mt-2 text-sm font-semibold text-green-600">
-                    Margem: R$ {lead.last_margin.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                <div className={`mt-2 text-sm font-semibold flex items-center justify-between ${(lead.last_margin || 0) > 5000 ? 'text-amber-600' : 'text-green-600'
+                    }`}>
+                    <span>Margem: R$ {lead.last_margin.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+
+                    {(lead.last_margin || 0) > 5000 && (
+                        <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold border border-amber-200">
+                            OURO
+                        </span>
+                    )}
                 </div>
             )}
 
