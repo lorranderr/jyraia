@@ -163,6 +163,7 @@ export default function CampanhasPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     numbers: selectedLeads.map(l => ({
+                        id: l.id,
                         phone: l.phone,
                         name: l.name || 'Cliente'
                     })),

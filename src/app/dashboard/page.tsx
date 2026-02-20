@@ -5,7 +5,7 @@ import {
     Plus, Phone, User, AlertCircle, Clock,
     Edit, Trash2, X, MapPin, CreditCard, FileText, Info,
     History, Briefcase, TrendingUp, Calendar, Trash,
-    Search, Filter, XCircle
+    Search, Filter, XCircle, Play, CheckCircle2, Send
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import {
@@ -89,12 +89,15 @@ const KANBAN_COLUMNS = [
 function SortableLeadCard({
     lead,
     onEdit,
-    onDelete
+    onDelete,
+    onPlay
 }: {
     lead: Lead
     onEdit: (lead: Lead) => void
     onDelete: (id: string) => void
+    onPlay: (lead: Lead) => Promise<void>
 }) {
+    const [isSending, setIsSending] = useState(false)
     const {
         attributes,
         listeners,
@@ -131,6 +134,21 @@ function SortableLeadCard({
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
                     <button
+                        onClick={async (e) => {
+                            e.stopPropagation();
+                            if (isSending) return;
+                            setIsSending(true);
+                            await onPlay(lead);
+                            setIsSending(false);
+                        }}
+                        disabled={isSending}
+                        className={`p-2 transition-colors bg-gray-50 rounded-lg ${isSending ? 'text-orange-400 animate-pulse' : 'text-gray-400 hover:text-green-600 opacity-0 group-hover:opacity-100'
+                            }`}
+                        title="Enviar Mensagem Rápida"
+                    >
+                        {isSending ? <Clock size={16} /> : <Play size={16} />}
+                    </button>
+                    <button
                         onClick={(e) => {
                             e.stopPropagation();
                             onEdit(lead);
@@ -143,9 +161,7 @@ function SortableLeadCard({
                     <button
                         onClick={(e) => {
                             e.stopPropagation();
-                            if (confirm('Deseja excluir este lead?')) {
-                                onDelete(lead.id);
-                            }
+                            onDelete(lead.id);
                         }}
                         className="p-2 text-gray-400 hover:text-red-600 transition-colors opacity-0 group-hover:opacity-100 bg-gray-50 rounded-lg"
                         title="Excluir Lead"
@@ -220,13 +236,15 @@ function KanbanColumn({
     leads,
     loading,
     onEdit,
-    onDelete
+    onDelete,
+    onPlay
 }: {
     column: any,
     leads: Lead[],
     loading: boolean,
     onEdit: (lead: Lead) => void,
-    onDelete: (id: string) => void
+    onDelete: (id: string) => void,
+    onPlay: (lead: Lead) => Promise<void>
 }) {
     const { setNodeRef } = useDroppable({
         id: column.id,
@@ -284,6 +302,7 @@ function KanbanColumn({
                                         lead={lead}
                                         onEdit={onEdit}
                                         onDelete={onDelete}
+                                        onPlay={onPlay}
                                     />
                                 ))
                             )}
@@ -293,6 +312,15 @@ function KanbanColumn({
             </div>
         </div>
     );
+}
+
+// Interface de Interações
+interface CampaignLog {
+    id: string
+    status: string
+    error_description: string | null
+    message_text: string
+    created_at: string
 }
 
 // Modal de Lead com Abas
@@ -310,7 +338,9 @@ function LeadModal({
     const [activeTab, setActiveTab] = useState('essencial')
     const [formData, setFormData] = useState<Partial<Lead>>({})
     const [contracts, setContracts] = useState<Contract[]>([])
+    const [interactions, setInteractions] = useState<CampaignLog[]>([])
     const [loadingContracts, setLoadingContracts] = useState(false)
+    const [loadingInteractions, setLoadingInteractions] = useState(false)
     const [showNewContractForm, setShowNewContractForm] = useState(false)
     const [newContract, setNewContract] = useState<Partial<Contract>>({
         valor_total: 0,
@@ -323,6 +353,7 @@ function LeadModal({
         if (lead && isOpen) {
             setFormData(lead)
             loadContracts(lead.id)
+            loadInteractions(lead.id)
         } else {
             setFormData({
                 status: 'novo',
@@ -357,6 +388,21 @@ function LeadModal({
             setContracts(data)
         }
         setLoadingContracts(false)
+    }
+
+    const loadInteractions = async (leadId: string) => {
+        setLoadingInteractions(true)
+        const { data, error } = await supabase
+            .from('campaign_logs')
+            .select('*')
+            .eq('lead_id', leadId)
+            .order('created_at', { ascending: false })
+
+        if (!error && data) {
+            setInteractions(data)
+        }
+        setLoadingInteractions(true) // Erro proposital no original? Não, deve ser false. Corrigindo.
+        setLoadingInteractions(false)
     }
 
     const handleAddContract = async () => {
@@ -394,6 +440,7 @@ function LeadModal({
         { id: 'endereco', label: 'Endereço', icon: MapPin },
         { id: 'bancario', label: 'Bancário', icon: CreditCard },
         { id: 'historico_jat', label: 'Histórico JAT', icon: History },
+        { id: 'interacoes', label: 'Interações', icon: Send },
     ]
 
     return (
@@ -835,6 +882,55 @@ function LeadModal({
                             )}
                         </div>
                     )}
+
+                    {activeTab === 'interacoes' && (
+                        <div className="space-y-4">
+                            <h3 className="text-sm font-bold text-gray-800 uppercase tracking-wider">Histórico de Mensagens</h3>
+
+                            {loadingInteractions ? (
+                                <div className="flex justify-center p-8">
+                                    <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                                </div>
+                            ) : interactions.length === 0 ? (
+                                <div className="text-center py-12 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
+                                    <Send className="mx-auto text-gray-300 mb-2" size={32} />
+                                    <p className="text-gray-500 text-sm italic">Nenhuma interação registrada para este lead.</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {interactions.map((log) => (
+                                        <div key={log.id} className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm">
+                                            <div className="flex items-center justify-between mb-2">
+                                                <div className="flex items-center gap-2">
+                                                    {log.status === 'success' ? (
+                                                        <span className="flex items-center gap-1 text-[10px] font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full uppercase">
+                                                            <CheckCircle2 size={10} /> Sucesso
+                                                        </span>
+                                                    ) : (
+                                                        <span className="flex items-center gap-1 text-[10px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-full uppercase">
+                                                            <XCircle size={10} /> Erro
+                                                        </span>
+                                                    )}
+                                                    <span className="text-[10px] text-gray-400 font-mono">
+                                                        {new Date(log.created_at).toLocaleString('pt-BR')}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <p className="text-xs text-gray-700 italic border-l-2 border-gray-100 pl-3 mb-2 leading-relaxed">
+                                                "{log.message_text}"
+                                            </p>
+                                            {log.error_description && (
+                                                <div className="bg-red-50/50 text-[10px] text-red-700 p-2 rounded border border-red-100 mt-2 flex items-start gap-2">
+                                                    <AlertCircle size={12} className="shrink-0 mt-0.5" />
+                                                    <span><strong>Motivo da Parada:</strong> {log.error_description}</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </form>
 
                 {/* Action Buttons */}
@@ -956,6 +1052,8 @@ export default function LeadsPage() {
     }
 
     const handleDeleteLead = async (id: string) => {
+        if (!confirm('Deseja excluir este lead?')) return
+
         const { error } = await supabase
             .from('leads')
             .delete()
@@ -963,6 +1061,27 @@ export default function LeadsPage() {
 
         if (!error) {
             setLeads(leads.filter(l => l.id !== id))
+        }
+    }
+
+    const handlePlayLead = async (lead: Lead) => {
+        const defaultMessage = "Olá {nome}! Tudo bem? Gostaria de conversar sobre sua margem disponível."
+
+        try {
+            await fetch('/api/campaign/send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    numbers: [{
+                        id: lead.id,
+                        phone: lead.phone,
+                        name: lead.name || 'Cliente'
+                    }],
+                    text: defaultMessage,
+                }),
+            })
+        } catch (err) {
+            console.error('Erro no disparo individual:', err)
         }
     }
 
@@ -1161,6 +1280,7 @@ export default function LeadsPage() {
                                     setIsModalOpen(true)
                                 }}
                                 onDelete={handleDeleteLead}
+                                onPlay={handlePlayLead}
                             />
                         ))}
                     </div>
