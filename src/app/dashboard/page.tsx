@@ -2,10 +2,10 @@
 
 import { useState, useEffect } from 'react'
 import {
-    Plus, Phone, User, AlertCircle, Clock,
+    Plus, Phone, User, AlertCircle,
     Edit, Trash2, X, MapPin, CreditCard, FileText, Info,
     History, Briefcase, TrendingUp, Calendar, Trash,
-    Search, Filter, XCircle, Play, CheckCircle2, Send
+    Search, Filter, XCircle, CheckCircle2, Send
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import {
@@ -90,14 +90,11 @@ function SortableLeadCard({
     lead,
     onEdit,
     onDelete,
-    onPlay
 }: {
     lead: Lead
     onEdit: (lead: Lead) => void
     onDelete: (id: string) => void
-    onPlay: (lead: Lead) => Promise<void>
 }) {
-    const [isSending, setIsSending] = useState(false)
     const {
         attributes,
         listeners,
@@ -133,21 +130,7 @@ function SortableLeadCard({
                     </div>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
-                    <button
-                        onClick={async (e) => {
-                            e.stopPropagation();
-                            if (isSending) return;
-                            setIsSending(true);
-                            await onPlay(lead);
-                            setIsSending(false);
-                        }}
-                        disabled={isSending}
-                        className={`p-2 transition-colors bg-gray-50 rounded-lg ${isSending ? 'text-orange-400 animate-pulse' : 'text-gray-400 hover:text-green-600 opacity-0 group-hover:opacity-100'
-                            }`}
-                        title="Enviar Mensagem Rápida"
-                    >
-                        {isSending ? <Clock size={16} /> : <Play size={16} />}
-                    </button>
+
                     <button
                         onClick={(e) => {
                             e.stopPropagation();
@@ -237,14 +220,12 @@ function KanbanColumn({
     loading,
     onEdit,
     onDelete,
-    onPlay
 }: {
     column: any,
     leads: Lead[],
     loading: boolean,
     onEdit: (lead: Lead) => void,
     onDelete: (id: string) => void,
-    onPlay: (lead: Lead) => Promise<void>
 }) {
     const { setNodeRef } = useDroppable({
         id: column.id,
@@ -302,7 +283,6 @@ function KanbanColumn({
                                         lead={lead}
                                         onEdit={onEdit}
                                         onDelete={onDelete}
-                                        onPlay={onPlay}
                                     />
                                 ))
                             )}
@@ -342,6 +322,7 @@ function LeadModal({
     const [loadingContracts, setLoadingContracts] = useState(false)
     const [loadingInteractions, setLoadingInteractions] = useState(false)
     const [showNewContractForm, setShowNewContractForm] = useState(false)
+    const [phoneError, setPhoneError] = useState('')
     const [newContract, setNewContract] = useState<Partial<Contract>>({
         valor_total: 0,
         banco_parceiro: '',
@@ -372,7 +353,19 @@ function LeadModal({
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault()
-        onSave(formData)
+
+        // Validação do telefone: apenas dígitos, 13 caracteres, começando com 55
+        const phone = formData.phone || ''
+        const phoneDigits = phone.replace(/\D/g, '')
+
+        if (!phoneDigits || phoneDigits.length !== 13 || !phoneDigits.startsWith('55')) {
+            setPhoneError('O telefone deve seguir o formato: 5587992052920 (código do país + DDD + número, 13 dígitos)')
+            setActiveTab('essencial')
+            return
+        }
+
+        setPhoneError('')
+        onSave({ ...formData, phone: phoneDigits })
         onClose()
     }
 
@@ -498,11 +491,24 @@ function LeadModal({
                                 <input
                                     type="tel"
                                     value={formData.phone || ''}
-                                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                                    onChange={(e) => {
+                                        // Aceita apenas dígitos
+                                        const digits = e.target.value.replace(/\D/g, '')
+                                        setFormData({ ...formData, phone: digits })
+                                        if (phoneError) setPhoneError('')
+                                    }}
+                                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary outline-none ${phoneError ? 'border-red-400 bg-red-50/30' : 'border-gray-300'
+                                        }`}
                                     required
+                                    maxLength={13}
+                                    placeholder="5587992052920"
                                     suppressHydrationWarning
                                 />
+                                {phoneError && (
+                                    <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                                        <span>⚠️</span> {phoneError}
+                                    </p>
+                                )}
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Status do Lead</label>
@@ -1024,47 +1030,8 @@ export default function LeadsPage() {
     const professions = Array.from(new Set(leads.map(l => l.profissao).filter(Boolean))) as string[]
     const banks = Array.from(new Set(leads.map(l => l.ultimo_emprestimo_banco).filter(Boolean))) as string[]
 
-    const handleSaveLead = async (leadData: Partial<Lead>) => {
-        if (leadData.id) {
-            // Update
-            const { data, error } = await supabase
-                .from('leads')
-                .update(leadData)
-                .eq('id', leadData.id)
-                .select()
-                .single()
-
-            if (!error && data) {
-                setLeads(leads.map(l => l.id === data.id ? data : l))
-            }
-        } else {
-            // Create
-            const { data, error } = await supabase
-                .from('leads')
-                .insert([leadData])
-                .select()
-                .single()
-
-            if (!error && data) {
-                setLeads([data, ...leads])
-            }
-        }
-    }
-
-    const handleDeleteLead = async (id: string) => {
-        if (!confirm('Deseja excluir este lead?')) return
-
-        const { error } = await supabase
-            .from('leads')
-            .delete()
-            .eq('id', id)
-
-        if (!error) {
-            setLeads(leads.filter(l => l.id !== id))
-        }
-    }
-
-    const handlePlayLead = async (lead: Lead) => {
+    // Dispara mensagem automática para o lead após salvar
+    const sendAutoMessage = async (lead: Lead) => {
         const defaultMessage = "Olá {nome}! Tudo bem? Gostaria de conversar sobre sua margem disponível."
 
         try {
@@ -1081,7 +1048,51 @@ export default function LeadsPage() {
                 }),
             })
         } catch (err) {
-            console.error('Erro no disparo individual:', err)
+            console.error('Erro no disparo automático:', err)
+        }
+    }
+
+    const handleSaveLead = async (leadData: Partial<Lead>) => {
+        if (leadData.id) {
+            // Update
+            const { data, error } = await supabase
+                .from('leads')
+                .update(leadData)
+                .eq('id', leadData.id)
+                .select()
+                .single()
+
+            if (!error && data) {
+                setLeads(leads.map(l => l.id === data.id ? data : l))
+                // Disparo automático ao editar
+                await sendAutoMessage(data as Lead)
+            }
+        } else {
+            // Create
+            const { data, error } = await supabase
+                .from('leads')
+                .insert([leadData])
+                .select()
+                .single()
+
+            if (!error && data) {
+                setLeads([data, ...leads])
+                // Disparo automático ao cadastrar
+                await sendAutoMessage(data as Lead)
+            }
+        }
+    }
+
+    const handleDeleteLead = async (id: string) => {
+        if (!confirm('Deseja excluir este lead?')) return
+
+        const { error } = await supabase
+            .from('leads')
+            .delete()
+            .eq('id', id)
+
+        if (!error) {
+            setLeads(leads.filter(l => l.id !== id))
         }
     }
 
@@ -1280,7 +1291,6 @@ export default function LeadsPage() {
                                     setIsModalOpen(true)
                                 }}
                                 onDelete={handleDeleteLead}
-                                onPlay={handlePlayLead}
                             />
                         ))}
                     </div>

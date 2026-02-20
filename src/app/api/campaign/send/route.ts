@@ -9,8 +9,13 @@ const EVOLUTION_INSTANCE = process.env.EVOLUTION_INSTANCE!
 const DELAY_MS = 15000 // 15 segundos entre cada disparo
 
 interface SendRequest {
-    numbers: { id: string; phone: string; name: string }[] // Agora esperamos também o ID do lead
+    numbers: { id: string; phone: string; name: string }[]
     text: string
+    media?: {
+        base64: string
+        mimetype: string
+        filename: string
+    }
 }
 
 export async function POST(request: NextRequest) {
@@ -36,11 +41,11 @@ export async function POST(request: NextRequest) {
 
     try {
         const body: SendRequest = await request.json()
-        const { numbers, text } = body
+        const { numbers, text, media } = body
 
-        if (!numbers || !text || numbers.length === 0) {
+        if (!numbers || (!text && !media) || numbers.length === 0) {
             return NextResponse.json(
-                { error: 'Números e mensagem são obrigatórios' },
+                { error: 'Números e mensagem (ou imagem) são obrigatórios' },
                 { status: 400 }
             )
         }
@@ -63,20 +68,47 @@ export async function POST(request: NextRequest) {
             let logError = ''
 
             try {
-                const response = await fetch(
-                    `${EVOLUTION_API_URL}/message/sendText/${EVOLUTION_INSTANCE}`,
-                    {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'apikey': EVOLUTION_API_TOKEN,
-                        },
-                        body: JSON.stringify({
-                            number: cleanNumber,
-                            text: personalizedText,
-                        }),
-                    }
-                )
+                let response: Response
+
+                if (media) {
+                    // Enviar com imagem via sendMedia
+                    response = await fetch(
+                        `${EVOLUTION_API_URL}/message/sendMedia/${EVOLUTION_INSTANCE}`,
+                        {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'apikey': EVOLUTION_API_TOKEN,
+                            },
+                            body: JSON.stringify({
+                                number: cleanNumber,
+                                media: {
+                                    mediatype: 'image',
+                                    mimetype: media.mimetype,
+                                    caption: personalizedText || undefined,
+                                    media: media.base64,
+                                    fileName: media.filename,
+                                },
+                            }),
+                        }
+                    )
+                } else {
+                    // Enviar apenas texto
+                    response = await fetch(
+                        `${EVOLUTION_API_URL}/message/sendText/${EVOLUTION_INSTANCE}`,
+                        {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'apikey': EVOLUTION_API_TOKEN,
+                            },
+                            body: JSON.stringify({
+                                number: cleanNumber,
+                                text: personalizedText,
+                            }),
+                        }
+                    )
+                }
 
                 if (response.ok) {
                     results.push({ id, phone, name, success: true })

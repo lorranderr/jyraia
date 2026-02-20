@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import {
     Megaphone, Send, Filter, Search, Users, CheckCircle,
     XCircle, AlertCircle, Loader2, Phone, User, ChevronDown,
-    ChevronUp, Info
+    ChevronUp, Info, ImagePlus, X, Trash2
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
@@ -35,6 +35,11 @@ export default function CampanhasPage() {
     const [leads, setLeads] = useState<Lead[]>([])
     const [loading, setLoading] = useState(true)
     const [message, setMessage] = useState('')
+
+    // Imagem da campanha
+    const [imageFile, setImageFile] = useState<File | null>(null)
+    const [imagePreview, setImagePreview] = useState<string | null>(null)
+    const fileInputRef = useRef<HTMLInputElement>(null)
 
     // Filtros
     const [filterBank, setFilterBank] = useState('')
@@ -144,8 +149,8 @@ export default function CampanhasPage() {
     const selectedLeads = filteredLeads.filter(l => selectedIds.has(l.id))
 
     const handleSend = async () => {
-        console.log('handleSend clicked', { messageLen: message.length, selectedLeadsLen: selectedLeads.length })
-        if (!message.trim() || selectedLeads.length === 0) return
+        console.log('handleSend clicked', { messageLen: message.length, selectedLeadsLen: selectedLeads.length, hasImage: !!imageFile })
+        if ((!message.trim() && !imageFile) || selectedLeads.length === 0) return
         setIsConfirmModalOpen(true)
     }
 
@@ -156,6 +161,20 @@ export default function CampanhasPage() {
         setResults([])
         setShowResults(true)
         setCompletionDate(null)
+
+        // Converter imagem para base64 se existir
+        let imageBase64: string | null = null
+        if (imageFile) {
+            imageBase64 = await new Promise<string>((resolve) => {
+                const reader = new FileReader()
+                reader.onloadend = () => {
+                    const result = reader.result as string
+                    // Remove o prefixo data:image/xxx;base64,
+                    resolve(result.split(',')[1])
+                }
+                reader.readAsDataURL(imageFile)
+            })
+        }
 
         try {
             const response = await fetch('/api/campaign/send', {
@@ -168,6 +187,13 @@ export default function CampanhasPage() {
                         name: l.name || 'Cliente'
                     })),
                     text: message,
+                    ...(imageBase64 && {
+                        media: {
+                            base64: imageBase64,
+                            mimetype: imageFile!.type,
+                            filename: imageFile!.name,
+                        }
+                    }),
                 }),
             })
 
@@ -175,7 +201,6 @@ export default function CampanhasPage() {
             console.log('Response received', data)
 
             if (data.results) {
-                // Adicionar o texto e timestamp aos resultados
                 const enrichedResults = data.results.map((r: any) => ({
                     ...r,
                     text: message.replace(/\{nome\}/gi, r.name || 'Cliente'),
@@ -189,6 +214,25 @@ export default function CampanhasPage() {
         }
 
         setCampaignStatus('done')
+    }
+
+    // Handlers de imagem
+    const handleImageSelect = (file: File) => {
+        if (!file.type.startsWith('image/')) return
+        if (file.size > 5 * 1024 * 1024) {
+            alert('A imagem deve ter no máximo 5MB')
+            return
+        }
+        setImageFile(file)
+        const reader = new FileReader()
+        reader.onloadend = () => setImagePreview(reader.result as string)
+        reader.readAsDataURL(file)
+    }
+
+    const handleRemoveImage = () => {
+        setImageFile(null)
+        setImagePreview(null)
+        if (fileInputRef.current) fileInputRef.current.value = ''
     }
 
     const statusOptions = [
@@ -212,8 +256,8 @@ export default function CampanhasPage() {
                 </div>
             </div>
 
-            {/* Mensagem */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-6 space-y-3">
+            {/* Mensagem + Imagem */}
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-6 space-y-4">
                 <div className="flex items-center justify-between">
                     <label className="text-sm font-bold text-gray-700 uppercase tracking-wider">Mensagem</label>
                     <span className="text-[10px] text-gray-400 bg-gray-50 px-2 py-1 rounded font-mono">
@@ -227,6 +271,67 @@ export default function CampanhasPage() {
                     className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all resize-none text-sm"
                     rows={4}
                 />
+
+                {/* Upload de Imagem */}
+                <div>
+                    <label className="text-sm font-bold text-gray-700 uppercase tracking-wider block mb-2">
+                        Imagem <span className="text-gray-400 font-normal normal-case">(opcional)</span>
+                    </label>
+
+                    {imagePreview ? (
+                        <div className="relative inline-block">
+                            <img
+                                src={imagePreview}
+                                alt="Preview da campanha"
+                                className="max-h-48 rounded-xl border border-gray-200 shadow-sm object-contain"
+                            />
+                            <button
+                                type="button"
+                                onClick={handleRemoveImage}
+                                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-md hover:bg-red-600 transition-colors"
+                                title="Remover imagem"
+                            >
+                                <X size={14} />
+                            </button>
+                            <div className="mt-2 flex items-center gap-2 text-xs text-gray-500">
+                                <ImagePlus size={12} />
+                                <span>{imageFile?.name}</span>
+                                <span className="text-gray-300">•</span>
+                                <span>{((imageFile?.size || 0) / 1024).toFixed(0)} KB</span>
+                            </div>
+                        </div>
+                    ) : (
+                        <div
+                            onClick={() => fileInputRef.current?.click()}
+                            onDragOver={(e) => { e.preventDefault(); e.stopPropagation() }}
+                            onDrop={(e) => {
+                                e.preventDefault(); e.stopPropagation()
+                                const file = e.dataTransfer.files?.[0]
+                                if (file) handleImageSelect(file)
+                            }}
+                            className="border-2 border-dashed border-gray-200 rounded-xl p-6 flex flex-col items-center gap-2 cursor-pointer hover:border-primary/40 hover:bg-primary/5 transition-all group"
+                        >
+                            <ImagePlus size={28} className="text-gray-300 group-hover:text-primary/60 transition-colors" />
+                            <span className="text-xs text-gray-400 group-hover:text-gray-600 transition-colors">
+                                Clique ou arraste uma imagem aqui
+                            </span>
+                            <span className="text-[10px] text-gray-300">
+                                PNG, JPG ou WEBP • Máx. 5MB
+                            </span>
+                        </div>
+                    )}
+
+                    <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        onChange={(e) => {
+                            const file = e.target.files?.[0]
+                            if (file) handleImageSelect(file)
+                        }}
+                        className="hidden"
+                    />
+                </div>
             </div>
 
             {/* Filtros de Segmentação */}
@@ -393,7 +498,7 @@ export default function CampanhasPage() {
                 <button
                     type="button"
                     onClick={handleSend}
-                    disabled={campaignStatus === 'sending' || !message.trim() || selectedLeads.length === 0}
+                    disabled={campaignStatus === 'sending' || (!message.trim() && !imageFile) || selectedLeads.length === 0}
                     className="flex items-center justify-center gap-2 px-8 py-3 bg-accent text-white rounded-xl hover:bg-accent-dark transition-all shadow-md hover:shadow-lg active:scale-95 font-bold disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100"
                 >
                     {campaignStatus === 'sending' ? (
