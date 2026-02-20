@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
                 let response: Response
 
                 if (media) {
-                    // Enviar com imagem via sendMedia
+                    // Enviar com imagem via sendMedia (Evolution API v2 - campos na raiz)
                     response = await fetch(
                         `${EVOLUTION_API_URL}/message/sendMedia/${EVOLUTION_INSTANCE}`,
                         {
@@ -82,13 +82,11 @@ export async function POST(request: NextRequest) {
                             },
                             body: JSON.stringify({
                                 number: cleanNumber,
-                                media: {
-                                    mediatype: 'image',
-                                    mimetype: media.mimetype,
-                                    caption: personalizedText || undefined,
-                                    media: media.base64,
-                                    fileName: media.filename,
-                                },
+                                mediatype: 'image',
+                                mimetype: media.mimetype,
+                                caption: personalizedText || undefined,
+                                media: media.base64,
+                                fileName: media.filename,
                             }),
                         }
                     )

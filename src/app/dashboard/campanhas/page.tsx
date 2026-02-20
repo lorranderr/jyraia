@@ -162,17 +162,37 @@ export default function CampanhasPage() {
         setShowResults(true)
         setCompletionDate(null)
 
-        // Converter imagem para base64 se existir
+        // Comprimir e converter imagem para base64 se existir
         let imageBase64: string | null = null
         if (imageFile) {
             imageBase64 = await new Promise<string>((resolve) => {
-                const reader = new FileReader()
-                reader.onloadend = () => {
-                    const result = reader.result as string
-                    // Remove o prefixo data:image/xxx;base64,
-                    resolve(result.split(',')[1])
+                const img = new Image()
+                img.onload = () => {
+                    const canvas = document.createElement('canvas')
+                    const MAX_SIZE = 1024
+                    let { width, height } = img
+
+                    // Redimensionar mantendo proporção (máx 1024px)
+                    if (width > MAX_SIZE || height > MAX_SIZE) {
+                        if (width > height) {
+                            height = Math.round((height * MAX_SIZE) / width)
+                            width = MAX_SIZE
+                        } else {
+                            width = Math.round((width * MAX_SIZE) / height)
+                            height = MAX_SIZE
+                        }
+                    }
+
+                    canvas.width = width
+                    canvas.height = height
+                    const ctx = canvas.getContext('2d')!
+                    ctx.drawImage(img, 0, 0, width, height)
+
+                    // Exportar como JPEG com qualidade 0.7 (~70%)
+                    const dataUrl = canvas.toDataURL('image/jpeg', 0.7)
+                    resolve(dataUrl.split(',')[1])
                 }
-                reader.readAsDataURL(imageFile)
+                img.src = URL.createObjectURL(imageFile)
             })
         }
 
@@ -190,8 +210,8 @@ export default function CampanhasPage() {
                     ...(imageBase64 && {
                         media: {
                             base64: imageBase64,
-                            mimetype: imageFile!.type,
-                            filename: imageFile!.name,
+                            mimetype: 'image/jpeg',
+                            filename: (imageFile!.name.replace(/\.[^.]+$/, '') || 'campanha') + '.jpg',
                         }
                     }),
                 }),
