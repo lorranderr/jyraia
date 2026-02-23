@@ -104,6 +104,7 @@ export async function POST(request: NextRequest) {
                                 number: cleanNumber,
                                 text: personalizedText,
                             }),
+                            cache: 'no-store',
                         }
                     )
                 }
@@ -117,7 +118,8 @@ export async function POST(request: NextRequest) {
                     results.push({ id, phone, name, success: false, error: logError })
                 }
             } catch (err: any) {
-                logError = `Erro de conexão: ${err.message}`
+                const cause = err.cause ? ` (${err.cause.message})` : ''
+                logError = `Erro de conexão: ${err.message}${cause}`
                 results.push({ id, phone, name, success: false, error: logError })
             }
 

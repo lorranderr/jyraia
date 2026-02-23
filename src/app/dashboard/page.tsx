@@ -1035,7 +1035,7 @@ export default function LeadsPage() {
         const defaultMessage = "Olá {nome}! Tudo bem? Gostaria de conversar sobre sua margem disponível."
 
         try {
-            await fetch('/api/campaign/send', {
+            const response = await fetch('/api/campaign/send', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -1047,8 +1047,22 @@ export default function LeadsPage() {
                     text: defaultMessage,
                 }),
             })
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}))
+                console.error('Falha no disparo automático:', response.status, errorData)
+                alert(`⚠️ Lead salvo, mas a mensagem WhatsApp não foi enviada. Erro: ${errorData?.error || response.statusText}`)
+                return
+            }
+
+            const result = await response.json()
+            if (result.failed > 0) {
+                console.warn('Disparo automático com falha:', result)
+                alert(`⚠️ Lead salvo, mas a mensagem WhatsApp falhou para este número. Verifique o número ou a conexão da instância.`)
+            }
         } catch (err) {
             console.error('Erro no disparo automático:', err)
+            alert('⚠️ Lead salvo, mas não foi possível enviar a mensagem WhatsApp. Verifique sua conexão.')
         }
     }
 
