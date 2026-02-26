@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
     Plus, Phone, User, AlertCircle,
     Edit, Trash2, X, MapPin, CreditCard, FileText, Info,
     History, Briefcase, TrendingUp, Calendar, Trash,
-    Search, Filter, XCircle, CheckCircle2, Send
+    Search, Filter, XCircle, CheckCircle2, Send, MessageSquare, ChevronDown
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import {
@@ -76,6 +76,18 @@ interface Contract {
     status: string
     observacoes: string | null
     created_at: string
+}
+
+interface AutoMessage {
+    id: string
+    title: string
+    text: string
+}
+
+const DEFAULT_AUTO_MESSAGE: AutoMessage = {
+    id: 'default',
+    title: 'Padrão',
+    text: 'Olá {nome}! Tudo bem? Gostaria de conversar sobre sua margem disponível.',
 }
 
 const KANBAN_COLUMNS = [
@@ -394,7 +406,6 @@ function LeadModal({
         if (!error && data) {
             setInteractions(data)
         }
-        setLoadingInteractions(true) // Erro proposital no original? Não, deve ser false. Corrigindo.
         setLoadingInteractions(false)
     }
 
@@ -472,7 +483,7 @@ function LeadModal({
                 </div>
 
                 {/* Form Body */}
-                <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
+                <form id="lead-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
                     {activeTab === 'essencial' && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="col-span-1 md:col-span-2">
@@ -949,7 +960,8 @@ function LeadModal({
                         Cancelar
                     </button>
                     <button
-                        onClick={handleSubmit}
+                        type="submit"
+                        form="lead-form"
                         className="flex-1 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors font-medium shadow-sm"
                     >
                         Salvar Alterações
@@ -975,6 +987,15 @@ export default function LeadsPage() {
     const [filterFollowUp, setFilterFollowUp] = useState(false)
     const [showFilters, setShowFilters] = useState(false)
 
+    // Estados do seletor de mensagem inicial
+    const [autoMessages, setAutoMessages] = useState<AutoMessage[]>([DEFAULT_AUTO_MESSAGE])
+    const [activeAutoMessage, setActiveAutoMessage] = useState<AutoMessage>(DEFAULT_AUTO_MESSAGE)
+    const [showMessagePicker, setShowMessagePicker] = useState(false)
+    const [showNewMsgForm, setShowNewMsgForm] = useState(false)
+    const [newMsgTitle, setNewMsgTitle] = useState('')
+    const [newMsgText, setNewMsgText] = useState('')
+    const messagePickerRef = useRef<HTMLDivElement>(null)
+
     const sensors = useSensors(
         useSensor(PointerSensor, {
             activationConstraint: {
@@ -988,6 +1009,27 @@ export default function LeadsPage() {
 
     useEffect(() => {
         loadLeads()
+
+        // Carregar mensagens salvas do localStorage
+        const savedMsgs = localStorage.getItem('auto_messages')
+        const msgs: AutoMessage[] = savedMsgs ? JSON.parse(savedMsgs) : [DEFAULT_AUTO_MESSAGE]
+        setAutoMessages(msgs)
+
+        const activeId = localStorage.getItem('active_auto_message_id')
+        const active = msgs.find(m => m.id === activeId) ?? msgs[0]
+        setActiveAutoMessage(active)
+    }, [])
+
+    // Fechar dropdown ao clicar fora
+    useEffect(() => {
+        function handleClickOutside(e: MouseEvent) {
+            if (messagePickerRef.current && !messagePickerRef.current.contains(e.target as Node)) {
+                setShowMessagePicker(false)
+                setShowNewMsgForm(false)
+            }
+        }
+        document.addEventListener('mousedown', handleClickOutside)
+        return () => document.removeEventListener('mousedown', handleClickOutside)
     }, [])
 
     async function loadLeads() {
@@ -1030,40 +1072,67 @@ export default function LeadsPage() {
     const professions = Array.from(new Set(leads.map(l => l.profissao).filter(Boolean))) as string[]
     const banks = Array.from(new Set(leads.map(l => l.ultimo_emprestimo_banco).filter(Boolean))) as string[]
 
-    // Dispara mensagem automática para o lead após salvar
-    const sendAutoMessage = async (lead: Lead) => {
-        const defaultMessage = "Olá {nome}! Tudo bem? Gostaria de conversar sobre sua margem disponível."
+    // --- Funções do seletor de mensagem inicial ---
+    const saveMessages = (msgs: AutoMessage[]) => {
+        localStorage.setItem('auto_messages', JSON.stringify(msgs))
+        setAutoMessages(msgs)
+    }
 
-        try {
-            const response = await fetch('/api/campaign/send', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    numbers: [{
-                        id: lead.id,
-                        phone: lead.phone,
-                        name: lead.name || 'Cliente'
-                    }],
-                    text: defaultMessage,
-                }),
-            })
+    const selectMessage = (msg: AutoMessage) => {
+        localStorage.setItem('active_auto_message_id', msg.id)
+        setActiveAutoMessage(msg)
+        setShowMessagePicker(false)
+        setShowNewMsgForm(false)
+    }
 
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}))
-                console.error('Falha no disparo automático:', response.status, errorData)
-                alert(`⚠️ Lead salvo, mas a mensagem WhatsApp não foi enviada. Erro: ${errorData?.error || response.statusText}`)
-                return
-            }
-
-            const result = await response.json()
-            if (result.failed > 0) {
-                console.warn('Disparo automático com falha:', result)
-                alert(`⚠️ Lead salvo, mas a mensagem WhatsApp falhou para este número. Verifique o número ou a conexão da instância.`)
-            }
-        } catch (err) {
-            console.error('Erro no disparo automático:', err)
-            alert('⚠️ Lead salvo, mas não foi possível enviar a mensagem WhatsApp. Verifique sua conexão.')
+    const addNewMessage = () => {
+        if (!newMsgTitle.trim() || !newMsgText.trim()) return
+        const newMsg: AutoMessage = {
+            id: Date.now().toString(),
+            title: newMsgTitle.trim(),
+            text: newMsgText.trim(),
         }
+        const updated = [...autoMessages, newMsg]
+        saveMessages(updated)
+        selectMessage(newMsg)
+        setNewMsgTitle('')
+        setNewMsgText('')
+        setShowNewMsgForm(false)
+    }
+
+    const deleteMessage = (id: string) => {
+        const updated = autoMessages.filter(m => m.id !== id)
+        const fallback = updated.length > 0 ? updated[0] : DEFAULT_AUTO_MESSAGE
+        const finalList = updated.length > 0 ? updated : [DEFAULT_AUTO_MESSAGE]
+        saveMessages(finalList)
+        if (activeAutoMessage.id === id) selectMessage(fallback)
+    }
+    // --- Fim funções seletor ---
+
+    // Dispara mensagem automática para o lead após salvar (fire-and-forget)
+    const sendAutoMessage = (lead: Lead) => {
+        const defaultMessage = activeAutoMessage.text
+
+        fetch('/api/campaign/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                numbers: [{ id: lead.id, phone: lead.phone, name: lead.name || 'Cliente' }],
+                text: defaultMessage,
+            }),
+        })
+            .then(res => res.json())
+            .then(result => {
+                if (result.sent > 0) {
+                    console.log('✅ [WhatsApp] Mensagem enviada para', lead.name || lead.phone)
+                } else {
+                    const err = result.results?.[0]?.error || result.error || 'Erro desconhecido'
+                    console.warn('⚠️ [WhatsApp] Falha no envio:', err)
+                }
+            })
+            .catch(err => {
+                console.error('❌ [WhatsApp] Erro na chamada:', err.message)
+            })
     }
 
     const handleSaveLead = async (leadData: Partial<Lead>) => {
@@ -1078,8 +1147,7 @@ export default function LeadsPage() {
 
             if (!error && data) {
                 setLeads(leads.map(l => l.id === data.id ? data : l))
-                // Disparo automático ao editar
-                await sendAutoMessage(data as Lead)
+                sendAutoMessage(data as Lead)
             }
         } else {
             // Create
@@ -1090,9 +1158,11 @@ export default function LeadsPage() {
                 .single()
 
             if (!error && data) {
+                console.log('🆕 [FRONTEND] Lead criado:', data.id)
                 setLeads([data, ...leads])
-                // Disparo automático ao cadastrar
-                await sendAutoMessage(data as Lead)
+                sendAutoMessage(data as Lead)
+            } else {
+                console.error('❌ [FRONTEND] Erro ao criar lead:', error)
             }
         }
     }
@@ -1194,6 +1264,103 @@ export default function LeadsPage() {
                                 <span className="w-2 h-2 bg-primary rounded-full" />
                             )}
                         </button>
+
+                        {/* Seletor de Mensagem Inicial */}
+                        <div className="relative" ref={messagePickerRef}>
+                            <button
+                                onClick={() => { setShowMessagePicker(!showMessagePicker); setShowNewMsgForm(false) }}
+                                className={`flex items-center gap-2 px-3 md:px-4 py-2 rounded-xl transition-all font-medium border text-sm md:text-base
+                                    ${showMessagePicker
+                                        ? 'bg-primary/10 border-primary text-primary'
+                                        : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'}`}
+                            >
+                                <MessageSquare size={18} />
+                                <span className="hidden sm:inline max-w-[120px] truncate">{activeAutoMessage.title}</span>
+                                <ChevronDown size={14} />
+                            </button>
+
+                            {showMessagePicker && (
+                                <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-xl shadow-xl border border-gray-100 z-50 overflow-hidden">
+                                    <div className="px-4 py-3 border-b border-gray-100">
+                                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Mensagem ao cadastrar lead</p>
+                                    </div>
+
+                                    <div className="max-h-56 overflow-y-auto">
+                                        {autoMessages.map(msg => (
+                                            <div
+                                                key={msg.id}
+                                                onClick={() => selectMessage(msg)}
+                                                className={`flex items-start gap-3 px-4 py-3 cursor-pointer transition-colors hover:bg-gray-50
+                                                    ${activeAutoMessage.id === msg.id ? 'bg-primary/5' : ''}`}
+                                            >
+                                                <span className={`mt-1 w-3 h-3 rounded-full shrink-0 border-2
+                                                    ${activeAutoMessage.id === msg.id
+                                                        ? 'bg-primary border-primary'
+                                                        : 'border-gray-300'}`}
+                                                />
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-sm font-semibold text-gray-800">{msg.title}</p>
+                                                    <p className="text-xs text-gray-400 truncate">{msg.text}</p>
+                                                </div>
+                                                {autoMessages.length > 1 && (
+                                                    <button
+                                                        onClick={e => { e.stopPropagation(); deleteMessage(msg.id) }}
+                                                        className="shrink-0 text-gray-300 hover:text-red-400 transition-colors p-1"
+                                                    >
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    <div className="border-t border-gray-100 p-3">
+                                        {!showNewMsgForm ? (
+                                            <button
+                                                onClick={() => setShowNewMsgForm(true)}
+                                                className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-primary font-medium rounded-lg hover:bg-primary/5 transition-colors"
+                                            >
+                                                <Plus size={15} />
+                                                Nova mensagem
+                                            </button>
+                                        ) : (
+                                            <div className="space-y-2">
+                                                <input
+                                                    type="text"
+                                                    placeholder="Título (ex: Margem INSS)"
+                                                    value={newMsgTitle}
+                                                    onChange={e => setNewMsgTitle(e.target.value)}
+                                                    className="w-full text-sm px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-primary"
+                                                />
+                                                <textarea
+                                                    placeholder="Texto da mensagem... use {nome} para personalizar"
+                                                    value={newMsgText}
+                                                    onChange={e => setNewMsgText(e.target.value)}
+                                                    rows={3}
+                                                    className="w-full text-sm px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-primary resize-none"
+                                                />
+                                                <div className="flex gap-2">
+                                                    <button
+                                                        onClick={() => { setShowNewMsgForm(false); setNewMsgTitle(''); setNewMsgText('') }}
+                                                        className="flex-1 py-1.5 text-xs text-gray-500 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+                                                    >
+                                                        Cancelar
+                                                    </button>
+                                                    <button
+                                                        onClick={addNewMessage}
+                                                        disabled={!newMsgTitle.trim() || !newMsgText.trim()}
+                                                        className="flex-1 py-1.5 text-xs text-white bg-primary rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-40"
+                                                    >
+                                                        Salvar
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
                         <button
                             onClick={() => {
                                 setEditingLead(null)

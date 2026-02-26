@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient, type CookieOptions } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+import { createClient } from '@supabase/supabase-js'
 
 const EVOLUTION_API_URL = process.env.EVOLUTION_API_URL!
 const EVOLUTION_API_TOKEN = process.env.EVOLUTION_API_TOKEN!
@@ -19,29 +18,21 @@ interface SendRequest {
 }
 
 export async function POST(request: NextRequest) {
-    const cookieStore = await cookies()
+    console.log('[API] Rota /api/campaign/send acessada!')
 
-    const supabase = createServerClient(
+    // Service role key bypassa RLS; cai no anon key caso não configurado
+    const supabase = createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        {
-            cookies: {
-                get(name: string) {
-                    return cookieStore.get(name)?.value
-                },
-                set(name: string, value: string, options: CookieOptions) {
-                    cookieStore.set({ name, value, ...options })
-                },
-                remove(name: string, options: CookieOptions) {
-                    cookieStore.set({ name, value: '', ...options })
-                },
-            },
-        }
+        process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     )
 
     try {
+        console.log('[API] Aguardando request.json()...')
         const body: SendRequest = await request.json()
+        console.log('[API] request.json() resolvido!')
         const { numbers, text, media } = body
+        console.log('--- INICIANDO ENVIO AUTO API CAMPAIGN ---')
+        console.log('Payload Recebido:', JSON.stringify(body))
 
         if (!numbers || (!text && !media) || numbers.length === 0) {
             return NextResponse.json(
@@ -67,6 +58,9 @@ export async function POST(request: NextRequest) {
             let logStatus = 'error'
             let logError = ''
 
+            const controller = new AbortController()
+            const fetchTimeout = setTimeout(() => controller.abort(), 10000)
+
             try {
                 let response: Response
 
@@ -88,6 +82,7 @@ export async function POST(request: NextRequest) {
                                 media: media.base64,
                                 fileName: media.filename,
                             }),
+                            signal: controller.signal,
                         }
                     )
                 } else {
@@ -103,34 +98,50 @@ export async function POST(request: NextRequest) {
                             body: JSON.stringify({
                                 number: cleanNumber,
                                 text: personalizedText,
+                                delay: 1200,
                             }),
                             cache: 'no-store',
+                            signal: controller.signal,
                         }
                     )
                 }
 
+                clearTimeout(fetchTimeout)
+
                 if (response.ok) {
+                    const responseData = await response.json().catch(() => ({}));
+                    console.log('✅ EVO API OK:', responseData);
                     results.push({ id, phone, name, success: true })
                     logStatus = 'success'
                 } else {
                     const errorData = await response.text()
-                    logError = `Erro Evolution API: ${errorData}`
+                    console.log('❌ EVO API ERRO:', response.status, errorData);
+                    logError = `HTTP ${response.status}: ${errorData}`
                     results.push({ id, phone, name, success: false, error: logError })
                 }
             } catch (err: any) {
-                const cause = err.cause ? ` (${err.cause.message})` : ''
-                logError = `Erro de conexão: ${err.message}${cause}`
+                clearTimeout(fetchTimeout)
+                if (err.name === 'AbortError') {
+                    logError = 'Timeout: Evolution API não respondeu em 30 segundos'
+                } else {
+                    const cause = err.cause ? ` (${err.cause.message})` : ''
+                    logError = `Erro de conexão: ${err.message}${cause}`
+                }
+                console.error('❌ EVO API EXCEPTION:', logError)
                 results.push({ id, phone, name, success: false, error: logError })
             }
 
             // Salvar no Histórico (Supabase)
             if (id) {
-                await supabase.from('campaign_logs').insert([{
+                const { error: insertError } = await supabase.from('campaign_logs').insert([{
                     lead_id: id,
                     status: logStatus,
                     error_description: logError || null,
                     message_text: personalizedText
                 }])
+                if (insertError) {
+                    console.error('[API] Falha ao salvar campaign_log:', insertError.message)
+                }
             }
 
             // Delay entre disparos (exceto o último)
