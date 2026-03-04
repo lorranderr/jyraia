@@ -1012,7 +1012,12 @@ export default function LeadsPage() {
 
         // Carregar mensagens salvas do localStorage
         const savedMsgs = localStorage.getItem('auto_messages')
-        const msgs: AutoMessage[] = savedMsgs ? JSON.parse(savedMsgs) : [DEFAULT_AUTO_MESSAGE]
+        let msgs: AutoMessage[] = savedMsgs ? JSON.parse(savedMsgs) : [DEFAULT_AUTO_MESSAGE]
+
+        // Forçar atualização da mensagem padrão antiga que pode estar em cache no navegador
+        msgs = msgs.map(m => m.id === 'default' ? { ...m, text: DEFAULT_AUTO_MESSAGE.text } : m)
+        localStorage.setItem('auto_messages', JSON.stringify(msgs))
+
         setAutoMessages(msgs)
 
         const activeId = localStorage.getItem('active_auto_message_id')
