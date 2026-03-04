@@ -1,9 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const EVOLUTION_API_URL = process.env.EVOLUTION_API_URL!
 const EVOLUTION_API_TOKEN = process.env.EVOLUTION_API_TOKEN!
 const EVOLUTION_INSTANCE = process.env.EVOLUTION_INSTANCE!
+
+// Sanitiza a URL base: remove trailing slashes e paths acidentais
+// Isso previne duplicação como /message/sendText/Aline/message/sendText/Aline
+function getBaseUrl(): string {
+    let url = (process.env.EVOLUTION_API_URL || '').trim()
+    // Remove trailing slashes
+    url = url.replace(/\/+$/, '')
+    // Se a URL já contém /message/, extrai apenas o domínio base
+    const messageIndex = url.indexOf('/message/')
+    if (messageIndex !== -1) {
+        url = url.substring(0, messageIndex)
+    }
+    return url
+}
+
+const EVOLUTION_API_URL = getBaseUrl()
 
 const DELAY_MS = 15000 // 15 segundos entre cada disparo
 
@@ -19,6 +34,7 @@ interface SendRequest {
 
 export async function POST(request: NextRequest) {
     console.log('[API] Rota /api/campaign/send acessada!')
+    console.log('[API] EVOLUTION_API_URL (sanitizada):', EVOLUTION_API_URL)
 
     // Service role key bypassa RLS; cai no anon key caso não configurado
     const supabase = createClient(
