@@ -87,7 +87,7 @@ interface AutoMessage {
 const DEFAULT_AUTO_MESSAGE: AutoMessage = {
     id: 'default',
     title: 'Padrão',
-    text: 'Oi {nome}! 👋 Aqui é da JatCaixaAqui. Vi que você pode ter uma margem disponível excelente por aqui e não queria que você perdesse essa oportunidade. Podemos bater um papinho rápido sobre como isso pode te ajudar hoje? 🚀',
+    text: 'Oi {nome}! 👋 Aqui é da JatCaixaAqui. Vi que você pode ter uma oportunidade excelente por aqui e não queria que você perdesse. Podemos bater um papinho rápido sobre como isso pode te ajudar hoje? 🚀',
 }
 
 const KANBAN_COLUMNS = [
